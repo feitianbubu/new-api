@@ -1,5 +1,7 @@
 FRONTEND_DIR = ./web
 BACKEND_DIR = .
+COMMIT_ID?=$(shell git rev-parse --short HEAD)
+VERSION?=v0.0.1-${COMMIT_ID}
 
 .PHONY: all build-frontend start-backend
 
@@ -12,3 +14,9 @@ build-frontend:
 start-backend:
 	@echo "Starting backend dev server..."
 	@cd $(BACKEND_DIR) && go run main.go &
+
+swag:
+	@echo "Generating Swagger documentation..."
+	@cd $(BACKEND_DIR) && swag init --generatedTime --parseDependency --ot=json -o=web/dist/swag
+	@sed -i 's/"version": ".*"/"version": "$(VERSION)"/' web/dist/swag/swagger.json
+	@echo "Swagger documentation generated."

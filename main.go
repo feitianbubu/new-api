@@ -31,6 +31,25 @@ var buildFS embed.FS
 //go:embed web/dist/index.html
 var indexPage []byte
 
+// @title                       Clinx-云一大模型管理接口文档
+// @version                     v0.0.1
+// @description                # 功能特点
+// @description                * 支持多种大模型接入和管理
+// @description                * 统一的API调用接口
+// @description                * 完整的用户权限管理
+// @description                * 支持按用户计费和充值
+// @description
+// @description                # 使用说明
+// @description                1. 访问: https://newapi.clinx.work
+// @description                1. 注册用户,生成ApiKey令牌,新用户有免费试用额度
+// @description                2. 根据模型列表获取可用的模型列表
+// @description                3. 根据模型调用大模型接口
+// @description
+// @description                > 注意：遇到问题可直接在此页面调用接口,确认是接口问题还是调用问题
+// @securityDefinitions.apikey  ApiKeyAuth
+// @in                          header
+// @name                        x-token
+// @BasePath                    /
 func main() {
 	err := godotenv.Load(".env")
 	if err != nil {

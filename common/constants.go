@@ -1,6 +1,9 @@
 package common
 
 import (
+	"os"
+	"strings"
+
 	//"os"
 	//"strconv"
 	"sync"
@@ -8,6 +11,12 @@ import (
 
 	"github.com/google/uuid"
 )
+
+func init() {
+	if ver, err := os.ReadFile("VERSION"); err == nil {
+		Version = strings.TrimSpace(string(ver))
+	}
+}
 
 var StartTime = time.Now().Unix() // unit: second
 var Version = "v0.0.0"            // this hard coding will be replaced automatically when building, no need to manually change

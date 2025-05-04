@@ -3,7 +3,7 @@ BACKEND_DIR = .
 COMMIT_ID?=$(shell git rev-parse --short HEAD)
 VERSION?=v0.0.1-${COMMIT_ID}
 
-.PHONY: all build-frontend start-backend
+.PHONY: all build-frontend start-backend swag
 
 all: build-frontend start-backend
 
@@ -19,4 +19,5 @@ swag:
 	@echo "Generating Swagger documentation..."
 	@cd $(BACKEND_DIR) && swag init --generatedTime --parseDependency --ot=json -o=web/dist/swag
 	@sed -i 's/"version": ".*"/"version": "$(VERSION)"/' web/dist/swag/swagger.json
+	@echo $(VERSION) > VERSION
 	@echo "Swagger documentation generated."

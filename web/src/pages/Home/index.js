@@ -107,11 +107,11 @@ const Home = () => {
                   <p>
                     {t('源码')}：
                     <a
-                      href='https://github.com/Calcium-Ion/new-api'
+                      href='http://172.24.140.52:7080/sky/clinx-admin'
                       target='_blank'
                       rel='noreferrer'
                     >
-                      https://github.com/Calcium-Ion/new-api
+                      http://172.24.140.52:7080/sky/clinx-admin
                     </a>
                   </p>
                   

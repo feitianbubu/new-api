@@ -18,4 +18,5 @@ func SetClinxRouter(router *gin.Engine) {
 	httpRouter := relayV1Router.Group("")
 	httpRouter.Use(middleware.Distribute())
 	httpRouter.POST("/chat/completions", controller.Completions)
+	httpRouter.POST("/images/generations", controller.Generations)
 }

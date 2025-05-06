@@ -35,6 +35,23 @@ func ModelList(c *gin.Context) {
 // @Failure      500 {object} dto.OpenAIErrorWithStatusCode "内部服务器错误"
 // @Router       /clinx/v1/chat/completions [post]
 func Completions(c *gin.Context) {
+	clinxRelay(c)
+}
+
+// Generations
+// @Summary      图像生成
+// @Description  接收符合 OpenAI API 格式的图像生成请求
+// @Tags         Clinx
+// @Accept       json
+// @Produce      json
+// @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
+// @Param        request body dto.ImageRequest true "OpenAI 请求体"
+// @Router       /clinx/v1/images/generations [post]
+func Generations(c *gin.Context) {
+	clinxRelay(c)
+}
+
+func clinxRelay(c *gin.Context) {
 	c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/clinx")
 	Relay(c)
 }

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"one-api/relay"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,36 @@ func Generations(c *gin.Context) {
 	clinxRelay(c)
 }
 
-func clinxRelay(c *gin.Context) {
+func trimClinxPath(c *gin.Context) {
 	c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/clinx")
+}
+
+func clinxRelay(c *gin.Context) {
+	trimClinxPath(c)
 	Relay(c)
+}
+
+// SubmitImagine
+// @Summary		 图像生成_MJ
+// @Description  接收符合 Midjourney API 格式的图像生成请求
+// @Tags         Clinx
+// @Accept       json
+// @Produce      json
+// @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
+// @Param        request body dto.MidjourneyRequest true "Midjourney 请求体"
+// @Router       /clinx/mj/submit/imagine [post]
+func SubmitImagine(c *gin.Context) {
+	trimClinxPath(c)
+	RelayMidjourney(c)
+}
+
+// RelayMidjourneyImage
+// @Summary		 图像获取_MJ
+// @Description  获取 Midjourney 图像
+// @Tags         Clinx
+// @Param        id path string true "图像 ID" example(1746607709831346)
+// @Router       /clinx/mj/image/{id} [get]
+func RelayMidjourneyImage(c *gin.Context) {
+	trimClinxPath(c)
+	relay.RelayMidjourneyImage(c)
 }

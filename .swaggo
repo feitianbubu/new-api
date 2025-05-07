@@ -1,2 +1,3 @@
 replace dto.GeneralOpenAIRequest dto.ExampleGeneralOpenAIRequest
 replace dto.ImageRequest dto.ExampleImageRequest
+replace dto.MidjourneyRequest dto.ExampleMidjourneyRequest

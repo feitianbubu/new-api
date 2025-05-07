@@ -15,3 +15,8 @@ type ExampleImageRequest struct {
 	Size   string `json:"size" example:"256x256"`
 	Seed   int    `json:"seed" example:"-1"`
 }
+
+type ExampleMidjourneyRequest struct {
+	Prompt  string `json:"prompt" example:"Dog"`
+	BotType string `json:"botType" example:"MID_JOURNEY"`
+}

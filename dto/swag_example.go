@@ -15,3 +15,17 @@ type ExampleImageRequest struct {
 	Size   string `json:"size" example:"256x256"`
 	Seed   int    `json:"seed" example:"-1"`
 }
+
+type ExampleMidjourneyRequest struct {
+	Prompt      string   `json:"prompt" example:"Dog"`
+	CustomId    string   `json:"customId"`
+	BotType     string   `json:"botType" example:"MID_JOURNEY"`
+	NotifyHook  string   `json:"notifyHook"`
+	Action      string   `json:"action"`
+	Index       int      `json:"index"`
+	State       string   `json:"state"`
+	TaskId      string   `json:"taskId"`
+	Base64Array []string `json:"base64Array"`
+	Content     string   `json:"content"`
+	MaskBase64  string   `json:"maskBase64"`
+}

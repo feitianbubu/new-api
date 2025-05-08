@@ -2,8 +2,10 @@ FRONTEND_DIR = ./web
 BACKEND_DIR = .
 COMMIT_ID?=$(shell git rev-parse --short HEAD)
 VERSION?=v0.0.1-${COMMIT_ID}
+DOCKER_VERSION=latest
+DOCKER_IMAGE=clinx:${DOCKER_VERSION}
 
-.PHONY: all build-frontend start-backend swag
+.PHONY: all build-frontend start-backend swag docker-build
 
 all: build-frontend start-backend
 
@@ -21,3 +23,8 @@ swag:
 	@sed -i 's/"version": ".*"/"version": "$(VERSION)"/' web/dist/swag/swagger.json
 	@echo $(VERSION) > VERSION
 	@echo "Swagger documentation generated."
+
+docker-build:
+	@echo "Building Docker image..."
+	@docker build -t $(DOCKER_IMAGE) --build-arg VERSION=$(VERSION) $(BACKEND_DIR)
+	@echo "Docker image built with tag $(DOCKER_IMAGE)."

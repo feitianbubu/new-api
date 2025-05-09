@@ -110,6 +110,18 @@ func RequestEpay(c *gin.Context) {
 	notifyUrl, _ := url.Parse(callBackAddress + "/api/user/epay/notify")
 	tradeNo := fmt.Sprintf("%s%d", common.GetRandomString(6), time.Now().Unix())
 	tradeNo = fmt.Sprintf("USR%dNO%s", id, tradeNo)
+
+	// 处理支付宝官方支付
+	if req.PaymentMethod == "alipay" {
+		payUrl, err := service.CreateAlipayOrderAndGetPayURL(id, req.Amount, payMoney, tradeNo)
+		if err != nil {
+			c.JSON(200, gin.H{"message": "error", "data": err.Error()})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "success", "data": payUrl, "url": payUrl})
+		return
+	}
 	client := GetEpayClient()
 	if client == nil {
 		c.JSON(200, gin.H{"message": "error", "data": "当前管理员未配置支付信息"})
@@ -264,4 +276,108 @@ func RequestAmount(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
+}
+
+func AlipayNotify(c *gin.Context) {
+	params := make(map[string]string)
+	for k, v := range c.Request.URL.Query() {
+		params[k] = v[0]
+	}
+
+	if !service.VerifyAlipayCallback(params) {
+		c.String(200, "fail")
+		return
+	}
+
+	tradeStatus := params["trade_status"]
+	if tradeStatus == "TRADE_SUCCESS" {
+		tradeNo := params["out_trade_no"]
+		LockOrder(tradeNo)
+		defer UnlockOrder(tradeNo)
+
+		topUp := model.GetTopUpByTradeNo(tradeNo)
+		if topUp == nil {
+			log.Printf("支付宝回调未找到订单: %v", params)
+			return
+		}
+
+		if topUp.Status == "pending" {
+			topUp.Status = "success"
+			err := topUp.Update()
+			if err != nil {
+				log.Printf("支付宝回调更新订单失败: %v", topUp)
+				return
+			}
+
+			dAmount := decimal.NewFromInt(int64(topUp.Amount))
+			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
+			err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
+			if err != nil {
+				log.Printf("支付宝回调更新用户失败: %v", topUp)
+				return
+			}
+			log.Printf("支付宝回调更新用户成功 %v", topUp)
+			model.RecordLog(topUp.UserId, model.LogTypeTopup, fmt.Sprintf("使用支付宝充值成功，充值金额: %v，支付金额：%f", common.LogQuota(quotaToAdd), topUp.Money))
+		}
+	}
+	c.String(200, "success")
+}
+
+func AlipayReturn(c *gin.Context) {
+	params := make(map[string]string)
+	for k, v := range c.Request.URL.Query() {
+		params[k] = v[0]
+	}
+
+	if !service.VerifyAlipayCallback(params) {
+		c.HTML(200, "error.html", gin.H{
+			"message": "签名验证失败",
+		})
+		return
+	}
+
+	outTradeNo := params["out_trade_no"]
+	_, err := service.CheckTradeByOutTradeNo(c, outTradeNo)
+	if err != nil {
+		c.HTML(200, "error.html", gin.H{
+			"message": "查询订单失败",
+		})
+		return
+	}
+
+	topUp := model.GetTopUpByTradeNo(outTradeNo)
+	if topUp == nil {
+		c.HTML(200, "error.html", gin.H{
+			"message": "未找到订单信息",
+		})
+		return
+	}
+	if topUp.Status != "pending" {
+		c.HTML(200, "error.html", gin.H{
+			"message": "订单已处理",
+		})
+	}
+	topUp.Status = "success"
+	err = topUp.Update()
+	if err != nil {
+		c.HTML(200, "error.html", gin.H{
+			"message": "更新订单失败",
+		})
+		return
+	}
+	dAmount := decimal.NewFromInt(topUp.Amount)
+	dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+	quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
+	err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
+	if err != nil {
+		c.HTML(200, "error.html", gin.H{
+			"message": "更新用户失败",
+		})
+		return
+	}
+	log.Printf("支付宝回调更新用户成功 %v", topUp)
+	model.RecordLog(topUp.UserId, model.LogTypeTopup, fmt.Sprintf("使用支付宝充值成功，充值金额: %v，支付金额：%f", common.LogQuota(quotaToAdd), topUp.Money))
+	// 处理成功后跳转到成功页面
+	c.Redirect(302, "/log")
 }

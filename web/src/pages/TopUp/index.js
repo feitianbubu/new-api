@@ -37,6 +37,8 @@ const TopUp = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
   const [payWay, setPayWay] = useState('');
+  const [alipayEnabled, setAlipayEnabled] = useState(false);
+  const [epayEnabled, setEpayEnabled] = useState(false);
 
   const topUp = async () => {
     if (redemptionCode === '') {
@@ -113,6 +115,12 @@ const TopUp = () => {
         if (message === 'success') {
           let params = data;
           let url = res.data.url;
+          // 如果是支付宝官方支付，直接跳转
+          if (payWay === 'alipay') {
+            window.location.href = url;
+            return;
+          }
+          // 其他支付方式使用表单提交
           let form = document.createElement('form');
           form.action = url;
           form.method = 'POST';
@@ -169,6 +177,12 @@ const TopUp = () => {
       }
       if (status.enable_online_topup) {
         setEnableOnlineTopUp(status.enable_online_topup);
+      }
+      if (status.alipay_enabled) {
+        setAlipayEnabled(status.alipay_enabled);
+      }
+      if (status.epay_enabled) {
+          setEpayEnabled(status.epay_enabled);
       }
     }
     getUserQuota().then();
@@ -299,27 +313,45 @@ const TopUp = () => {
                     }}
                   />
                   <Space>
-                    <Button
-                      type={'primary'}
-                      theme={'solid'}
-                      onClick={async () => {
-                        preTopUp('zfb');
-                      }}
-                    >
-                      {t('支付宝')}
-                    </Button>
-                    <Button
-                      style={{
-                        backgroundColor: 'rgba(var(--semi-green-5), 1)',
-                      }}
-                      type={'primary'}
-                      theme={'solid'}
-                      onClick={async () => {
-                        preTopUp('wx');
-                      }}
-                    >
-                      {t('微信')}
-                    </Button>
+                    {epayEnabled && (
+                      <>
+                        <Button
+                          type={'primary'}
+                          theme={'solid'}
+                          onClick={async () => {
+                            preTopUp('zfb');
+                          }}
+                        >
+                          {t('易支付-支付宝')}
+                        </Button>
+                        <Button
+                          style={{
+                            backgroundColor: 'rgba(var(--semi-green-5), 1)',
+                          }}
+                          type={'primary'}
+                          theme={'solid'}
+                          onClick={async () => {
+                            preTopUp('wx');
+                          }}
+                        >
+                          {t('易支付-微信')}
+                        </Button>
+                      </>
+                    )}
+                    {alipayEnabled && (
+                      <Button
+                        style={{
+                          backgroundColor: '#1677ff',
+                        }}
+                        type={'primary'}
+                        theme={'solid'}
+                        onClick={async () => {
+                          preTopUp('alipay');
+                        }}
+                      >
+                        {t('支付宝')}
+                      </Button>
+                    )}
                   </Space>
                 </Form>
               </div>

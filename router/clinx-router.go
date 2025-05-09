@@ -9,8 +9,17 @@ import (
 func SetClinxRouter(router *gin.Engine) {
 	router.Use(middleware.CORS())
 	router.Use(middleware.DecompressRequestMiddleware())
+
+	legacyRouter := router.Group("")
+	legacyRouter.GET("/providers/providersList", controller.ProvidersList)
+	legacyRouter.GET("/providers/modelsList/:provider", controller.ModelList)
+	legacyRouter.GET("/providers/modelsList", controller.ModelList)
+	legacyChatRouter := router.Group("/v1/openai")
+	legacyChatRouter.Use(middleware.TokenAuth())
+	legacyChatRouter.Use(middleware.Distribute())
+	legacyChatRouter.POST("/:provider/chat/completions", controller.Completions)
+
 	clinxRouter := router.Group("/clinx")
-	clinxRouter.POST("/modelList", controller.ModelList)
 	clinxRouter.GET("/mj/image/:id", controller.RelayMidjourneyImage)
 	clinxRouter.Use(middleware.ModelRequestRateLimit())
 

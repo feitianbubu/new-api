@@ -182,6 +182,13 @@ func TokenAuth() func(c *gin.Context) {
 				c.Request.Header.Set("Authorization", "Bearer "+key)
 			}
 		}
+		// 临时兼容旧客户端无api-key todo remove by next version
+		if strings.Contains(c.Request.URL.Path, "/v1/openai") {
+			key := c.Request.Header.Get("Authorization")
+			if len(key) != 58 {
+				c.Request.Header.Set("Authorization", "Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm")
+			}
+		}
 		key := c.Request.Header.Get("Authorization")
 		parts := make([]string, 0)
 		key = strings.TrimPrefix(key, "Bearer ")

@@ -1,22 +1,50 @@
 package controller
 
 import (
+	"fmt"
+	"net/http"
+	"one-api/common"
+	"one-api/model"
 	"one-api/relay"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ModelList
-// @Summary 模型列表
-// @Description 获取系统当前模型列表的定价信息，包括模型价格、用户组倍率和可用用户组
 // @Tags Clinx
-// @Accept json
-// @Produce json
-// @Success 200 {object} gin.H "成功返回定价信息"
-// @Router /clinx/v1/modelList [post]
+// @Summary 模型列表
+// @Produce application/json
+// @Router /providers/modelsList/{provider} [get]
 func ModelList(c *gin.Context) {
-	GetPricing(c)
+	channelId, _ := strconv.Atoi(c.Param("provider"))
+	enableAbilities := model.GetAllEnableAbilities()
+	type ModelVo struct {
+		Provider  string `json:"provider"`
+		Model     string `json:"model_name"`
+		ModelType string `json:"model_type"`
+	}
+	mapData := make(map[string]ModelVo) //map[string]ModelVo
+	for _, ability := range enableAbilities {
+		if channelId == 0 || ability.ChannelId == channelId {
+			modelType := ""
+			if ability.Tag != nil {
+				modelType = *ability.Tag
+			}
+			name := ability.Model
+			mapData[name] = ModelVo{
+				Provider:  strconv.Itoa(channelId),
+				Model:     ability.Model,
+				ModelType: modelType,
+			}
+		}
+	}
+	var data []any
+	for _, v := range mapData {
+		data = append(data, v)
+	}
+	SuccessPage(c, data)
 }
 
 // Completions
@@ -36,6 +64,9 @@ func ModelList(c *gin.Context) {
 // @Failure      500 {object} dto.OpenAIErrorWithStatusCode "内部服务器错误"
 // @Router       /clinx/v1/chat/completions [post]
 func Completions(c *gin.Context) {
+	if strings.Contains(c.Request.URL.Path, "/openai") {
+		c.Request.URL.Path = "/v1/chat/completions"
+	}
 	clinxRelay(c)
 }
 
@@ -84,4 +115,75 @@ func SubmitImagine(c *gin.Context) {
 func RelayMidjourneyImage(c *gin.Context) {
 	trimClinxPath(c)
 	relay.RelayMidjourneyImage(c)
+}
+
+// ProvidersList
+// Deprecated
+// compatible with legacy API to be removed in future
+// @Tags Clinx
+// @Summary 渠道列表
+// @Produce application/json
+// @Router /providers/providersList [get]
+func ProvidersList(c *gin.Context) {
+	common.SysLog("Deprecated ProvidersList called")
+	channels, err := model.GetAllChannels(0, 999, false, false)
+	if err != nil {
+		Fail(c, "get channels failed")
+		return
+	}
+	type ProviderVo struct {
+		Id       string `json:"id"`
+		Name     string `json:"name"`
+		Provider string `json:"provider"`
+	}
+	var data []any
+	for _, channel := range channels {
+		if channel.Status != common.ChannelStatusEnabled {
+			continue
+		}
+		data = append(data, ProviderVo{
+			Id:       strconv.Itoa(channel.Id),
+			Name:     channel.Name,
+			Provider: strconv.Itoa(channel.Id),
+		})
+	}
+	SuccessPage(c, data)
+}
+
+type Response struct {
+	Code int         `json:"code"`
+	Data interface{} `json:"data"`
+	Msg  string      `json:"msg"`
+}
+
+func Success(c *gin.Context, data interface{}) {
+	common.SysLog(fmt.Sprintf("Success: %+v", data))
+	c.JSON(http.StatusOK, Response{
+		Code: 0,
+		Data: data,
+		Msg:  "success",
+	})
+}
+func SuccessPage(c *gin.Context, data []any) {
+	common.SysLog(fmt.Sprintf("SuccessPage: %+v", data))
+	type PageResult struct {
+		List  interface{} `json:"list"`
+		Total int64       `json:"total"`
+	}
+	c.JSON(http.StatusOK, Response{
+		Code: 0,
+		Data: PageResult{
+			List:  data,
+			Total: int64(len(data)),
+		},
+		Msg: "success",
+	})
+}
+func Fail(c *gin.Context, msg string) {
+	common.SysLog(fmt.Sprintf("Fail: %s", msg))
+	c.JSON(http.StatusOK, Response{
+		Code: 10000,
+		Data: nil,
+		Msg:  msg,
+	})
 }

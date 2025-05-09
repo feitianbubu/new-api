@@ -123,6 +123,14 @@ func InitOptionMap() {
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 
+	// 支付宝配置
+	common.OptionMap["AlipayEnabled"] = strconv.FormatBool(setting.AlipayEnabled)
+	common.OptionMap["AlipayAppId"] = setting.AlipayAppId
+	common.OptionMap["AlipayPrivateKey"] = setting.AlipayPrivateKey
+	common.OptionMap["AlipayPublicKey"] = setting.AlipayPublicKey
+	common.OptionMap["AlipayProductionEnabled"] = strconv.FormatBool(setting.AlipayProductionEnabled)
+	common.OptionMap["EpayEnabled"] = strconv.FormatBool(setting.EpayEnabled)
+
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
 	for k, v := range modelConfigs {
@@ -260,6 +268,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.SMTPSSLEnabled = boolValue
 		case "WorkerAllowHttpImageRequestEnabled":
 			setting.WorkerAllowHttpImageRequestEnabled = boolValue
+		case "AlipayProductionEnabled":
+			setting.AlipayProductionEnabled = boolValue
 		}
 	}
 	switch key {
@@ -378,6 +388,16 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.AutomaticDisableKeywordsFromString(value)
 	case "StreamCacheQueueLength":
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
+	case "AlipayEnabled":
+		setting.AlipayEnabled = value == "true"
+	case "AlipayAppId":
+		setting.AlipayAppId = value
+	case "AlipayPrivateKey":
+		setting.AlipayPrivateKey = value
+	case "AlipayPublicKey":
+		setting.AlipayPublicKey = value
+	case "EpayEnabled":
+		setting.EpayEnabled = value == "true"
 	}
 	return err
 }

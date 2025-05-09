@@ -10,6 +10,7 @@ import {
   TagInput,
   Spin,
   Card,
+  Divider,
 } from '@douyinfe/semi-ui';
 const { Text } = Typography;
 import {
@@ -73,6 +74,12 @@ const SystemSetting = () => {
     LinuxDOOAuthEnabled: '',
     LinuxDOClientId: '',
     LinuxDOClientSecret: '',
+    AlipayEnabled: false,
+    AlipayAppId: '',
+    AlipayPrivateKey: '',
+    AlipayPublicKey: '',
+    AlipayProductionEnabled: false,
+    EpayEnabled: false,
   });
 
   const [originInputs, setOriginInputs] = useState({});
@@ -113,6 +120,9 @@ const SystemSetting = () => {
           case 'LinuxDOOAuthEnabled':
           case 'oidc.enabled':
           case 'WorkerAllowHttpImageRequestEnabled':
+          case 'AlipayEnabled':
+          case 'AlipayProductionEnabled':
+          case 'EpayEnabled':
             item.value = item.value === 'true';
             break;
           case 'Price':
@@ -256,6 +266,22 @@ const SystemSetting = () => {
     if (originInputs['TopupGroupRatio'] !== inputs.TopupGroupRatio) {
       options.push({ key: 'TopupGroupRatio', value: inputs.TopupGroupRatio });
     }
+
+    // 添加支付宝配置
+    options.push({ key: 'AlipayEnabled', value: inputs.AlipayEnabled.toString() });
+    if (inputs.AlipayAppId !== '') {
+      options.push({ key: 'AlipayAppId', value: inputs.AlipayAppId });
+    }
+    if (inputs.AlipayPrivateKey !== undefined && inputs.AlipayPrivateKey !== '') {
+      options.push({ key: 'AlipayPrivateKey', value: inputs.AlipayPrivateKey });
+    }
+    if (inputs.AlipayPublicKey !== undefined && inputs.AlipayPublicKey !== '') {
+      options.push({ key: 'AlipayPublicKey', value: inputs.AlipayPublicKey });
+    }
+    options.push({ key: 'AlipayProductionEnabled', value: inputs.AlipayProductionEnabled.toString() });
+
+    // 添加易支付启用状态
+    options.push({ key: 'EpayEnabled', value: inputs.EpayEnabled.toString() });
 
     await updateOptions(options);
   };
@@ -597,8 +623,19 @@ const SystemSetting = () => {
               <Card>
                 <Form.Section text='支付设置'>
                   <Text>
-                    （当前仅支持易支付接口，默认使用上方服务器地址作为回调地址！）
+                    （当前支持易支付接口和支付宝官方接口，默认使用上方服务器地址作为回调地址！）
                   </Text>
+                  <Row
+                      gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                      style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Switch
+                          field='EpayEnabled'
+                          label='启用易支付'
+                      />
+                    </Col>
+                  </Row>
                   <Row
                     gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
                   >
@@ -620,6 +657,58 @@ const SystemSetting = () => {
                       <Form.Input
                         field='EpayKey'
                         label='易支付商户密钥'
+                        placeholder='敏感信息不会发送到前端显示'
+                        type='password'
+                      />
+                    </Col>
+                  </Row>
+                  <Divider>支付宝官方支付配置</Divider>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Switch
+                        field='AlipayEnabled'
+                        label='启用支付宝官方支付'
+                        size='default'
+                        checkedText='｜'
+                        uncheckedText='〇'
+                        onChange={(value) => handleCheckboxChange('AlipayEnabled', value)}
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Switch
+                        field='AlipayProductionEnabled'
+                        label='支付宝生产环境'
+                        size='default'
+                        checkedText='｜'
+                        uncheckedText='〇'
+                        onChange={(value) => handleCheckboxChange('AlipayProductionEnabled', value)}
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AlipayAppId'
+                        label='支付宝应用ID'
+                        placeholder='例如：2021000000000000'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AlipayPrivateKey'
+                        label='支付宝应用私钥'
+                        placeholder='敏感信息不会发送到前端显示'
+                        type='password'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='AlipayPublicKey'
+                        label='支付宝公钥'
                         placeholder='敏感信息不会发送到前端显示'
                         type='password'
                       />

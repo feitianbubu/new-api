@@ -9,6 +9,7 @@ import (
 )
 
 const KeyRequestBody = "key_request_body"
+const KeyResponseBody = "key_response_body"
 
 func GetRequestBody(c *gin.Context) ([]byte, error) {
 	requestBody, _ := c.Get(KeyRequestBody)

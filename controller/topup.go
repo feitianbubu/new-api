@@ -280,8 +280,10 @@ func RequestAmount(c *gin.Context) {
 
 func AlipayNotify(c *gin.Context) {
 	params := make(map[string]string)
-	for k, v := range c.Request.URL.Query() {
-		params[k] = v[0]
+	if err := c.Request.ParseForm(); err == nil {
+		for k, v := range c.Request.PostForm {
+			params[k] = v[0]
+		}
 	}
 
 	if !service.VerifyAlipayCallback(params) {
@@ -290,7 +292,7 @@ func AlipayNotify(c *gin.Context) {
 	}
 
 	tradeStatus := params["trade_status"]
-	if tradeStatus == "TRADE_SUCCESS" {
+	if tradeStatus == "TRADE_SUCCESS" || tradeStatus == "TRADE_FINISHED" {
 		tradeNo := params["out_trade_no"]
 		LockOrder(tradeNo)
 		defer UnlockOrder(tradeNo)

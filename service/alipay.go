@@ -60,7 +60,7 @@ func CreateAlipayTrade(amount float64, tradeNo string) (string, error) {
 
 	var p = alipay.TradePagePay{}
 	callBackAddress := GetCallbackAddress()
-	p.NotifyURL = callBackAddress + "/api/user/alipay/callback"
+	p.NotifyURL = callBackAddress + "/api/user/alipay/notify"
 	p.ReturnURL = callBackAddress + "/api/user/alipay/return"
 	p.Subject = "pay"
 	p.OutTradeNo = tradeNo
@@ -111,6 +111,9 @@ func CheckTradeByOutTradeNo(ctx context.Context, outTradeNo string) (ok bool, er
 
 	if rsp.IsFailure() {
 		return false, fmt.Errorf("alipay trade query failed: %s", rsp.SubMsg)
+	}
+	if rsp.TradeStatus != "TRADE_SUCCESS" && rsp.TradeStatus != "TRADE_FINISHED" {
+		return false, fmt.Errorf("alipay trade status is not success: %s", rsp.TradeStatus)
 	}
 	return true, nil
 }

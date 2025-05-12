@@ -32,4 +32,6 @@ func SetClinxRouter(router *gin.Engine) {
 	relayMjRouter := clinxRouter.Group("/mj")
 	relayMjRouter.Use(middleware.TokenAuth(), middleware.Distribute())
 	relayMjRouter.POST("/submit/imagine", controller.SubmitImagine)
+
+	SetBillsRouter(clinxRouter)
 }

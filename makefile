@@ -3,7 +3,7 @@ BACKEND_DIR = .
 COMMIT_ID?=$(shell git rev-parse --short HEAD)
 VERSION?=v0.0.1-${COMMIT_ID}
 DOCKER_VERSION=latest
-DOCKER_IMAGE=clinx:${DOCKER_VERSION}
+DOCKER_IMAGE=skynono/clinx:${DOCKER_VERSION}
 
 .PHONY: all build-frontend start-backend swag docker-build
 

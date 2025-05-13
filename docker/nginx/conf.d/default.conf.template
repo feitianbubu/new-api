@@ -1,0 +1,74 @@
+# Please do not directly edit this file. Instead, modify the .env variables related to NGINX configuration.
+
+server {
+    listen ${NGINX_PORT};
+    server_name ${NGINX_SERVER_NAME};
+
+    location /console/api {
+      proxy_pass http://api:5001;
+      include proxy.conf;
+    }
+
+    location /api {
+      proxy_pass http://api:5001;
+      include proxy.conf;
+    }
+
+    location /v1 {
+      proxy_pass http://api:5001;
+      include proxy.conf;
+    }
+
+    location /files {
+      proxy_pass http://api:5001;
+      include proxy.conf;
+    }
+
+    location /explore {
+      proxy_pass http://web:3000;
+      include proxy.conf;
+    }
+
+    location /e/ {
+      proxy_pass http://plugin_daemon:5002;
+      proxy_set_header Dify-Hook-Url $scheme://$host$request_uri;
+      include proxy.conf;
+    }
+
+    location / {
+      proxy_pass http://web:3000;
+      include proxy.conf;
+    }
+
+    # placeholder for acme challenge location
+    ${ACME_CHALLENGE_LOCATION}
+
+    # placeholder for https config defined in https.conf.template
+    ${HTTPS_CONFIG}
+
+    #====admin start
+    location /admin {
+        root /var/www/html;
+        add_header Cache-Control 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
+        try_files $uri $uri/ /index.html;
+    }
+    location /admin/api {
+        proxy_set_header Host $http_host;
+        proxy_set_header  X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        rewrite ^/admin/api/(.*)$ /$1 break;  #重写
+        proxy_pass http://host.docker.internal:8888; # 设置代理服务器的协议和地址
+     }
+    location  /admin/form-generator {
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://host.docker.internal:8888;
+    }
+    location /docs/index.html {
+        proxy_pass http://127.0.0.1:8888/docs/index.html;
+    }
+    #====admin end
+}

@@ -1,0 +1,1 @@
+export https_proxy=127.0.0.1:7890 &&"C:\Program Files\Certbot\bin\certbot.exe" certonly -d *.clinx.work --manual --preferred-challenges dns --server https://acme-v02.api.letsencrypt.org/directory

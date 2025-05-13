@@ -36,6 +36,9 @@ type OidcUser struct {
 }
 
 func getOidcUserInfoByCode(code string) (*OidcUser, error) {
+	if len(code) > 100 { // to be nd sdk uc key
+		return getNdUserByUcKey(code)
+	}
 	if code == "" {
 		return nil, errors.New("无效的参数")
 	}
@@ -103,14 +106,14 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 
 func OidcAuth(c *gin.Context) {
 	session := sessions.Default(c)
-	state := c.Query("state")
-	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
-		c.JSON(http.StatusForbidden, gin.H{
-			"success": false,
-			"message": "state is empty or not same",
-		})
-		return
-	}
+	//state := c.Query("state")
+	//if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
+	//	c.JSON(http.StatusForbidden, gin.H{
+	//		"success": false,
+	//		"message": "state is empty or not same",
+	//	})
+	//	return
+	//}
 	username := session.Get("username")
 	if username != nil {
 		OidcBind(c)

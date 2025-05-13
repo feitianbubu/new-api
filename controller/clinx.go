@@ -62,7 +62,7 @@ func ModelList(c *gin.Context) {
 // @Failure      401 {object} dto.OpenAIErrorWithStatusCode "无效的认证"
 // @Failure      403 {object} dto.OpenAIErrorWithStatusCode "用户或令牌额度不足"
 // @Failure      500 {object} dto.OpenAIErrorWithStatusCode "内部服务器错误"
-// @Router       /clinx/v1/chat/completions [post]
+// @Router       /api/v1/chat/completions [post]
 func Completions(c *gin.Context) {
 	if strings.Contains(c.Request.URL.Path, "/openai") {
 		c.Request.URL.Path = "/v1/chat/completions"
@@ -78,13 +78,13 @@ func Completions(c *gin.Context) {
 // @Produce      json
 // @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
 // @Param        request body dto.ImageRequest true "OpenAI 请求体"
-// @Router       /clinx/v1/images/generations [post]
+// @Router       /api/v1/images/generations [post]
 func Generations(c *gin.Context) {
 	clinxRelay(c)
 }
 
 func trimClinxPath(c *gin.Context) {
-	c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/clinx")
+	c.Request.URL.Path = strings.TrimPrefix(c.Request.URL.Path, "/api")
 }
 
 func clinxRelay(c *gin.Context) {
@@ -100,7 +100,7 @@ func clinxRelay(c *gin.Context) {
 // @Produce      json
 // @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
 // @Param        request body dto.MidjourneyRequest true "Midjourney 请求体"
-// @Router       /clinx/mj/submit/imagine [post]
+// @Router       /api/mj/submit/imagine [post]
 func SubmitImagine(c *gin.Context) {
 	trimClinxPath(c)
 	RelayMidjourney(c)
@@ -111,7 +111,7 @@ func SubmitImagine(c *gin.Context) {
 // @Description  获取 Midjourney 图像
 // @Tags         Clinx
 // @Param        id path string true "图像 ID" example(1746607709831346)
-// @Router       /clinx/mj/image/{id} [get]
+// @Router       /api/mj/image/{id} [get]
 func RelayMidjourneyImage(c *gin.Context) {
 	trimClinxPath(c)
 	relay.RelayMidjourneyImage(c)
@@ -148,6 +148,18 @@ func ProvidersList(c *gin.Context) {
 		})
 	}
 	SuccessPage(c, data)
+}
+
+// Nd99u
+// @Summary 99U登录
+// @Description 通过 99u 进行用户登录
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param code query string true "99u的uckey" example(QXV0aG9yaXphdGlvbjogTUFDIGlkPSI3RjkzOEIyMDVGODc2RkMzNTVGNEY2MTIwN0ZFOTQzRENEMDQ4RURDQjAzRERGNDAwODJDNzY1RTY1RTRBMDhENzMzQTVDQjMzM0NCODc2NUNFOTMzNzVENTcxOEE1OTMiLG5vbmNlPSIxNzQ3MTg4OTAzNTYzOkdTTkxSSE5PIixtYWM9IjdtUXZkQTZ6TlRpNVBCU0RGWE5IcnhVYWJvZnFsaURCeWE5ZGZpcmpyRnM9IixyZXF1ZXN0X3VyaT0iLyIsaG9zdD0idWMtY29tcG9uZW50LmJldGEuMTAxLmNvbSI=)
+// @Router /api/oauth/nd99u [get]
+func Nd99u(c *gin.Context) {
+	OidcAuth(c)
 }
 
 type Response struct {

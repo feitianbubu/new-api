@@ -19,10 +19,18 @@ import (
 )
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" example:"test1"`
+	Password string `json:"password" example:"12345678"`
 }
 
+// Login
+// @Summary 普通登录
+// @Description 通过用户名和密码进行用户登录
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "登录请求参数"
+// @Router /api/user/login [post]
 func Login(c *gin.Context) {
 	if !common.PasswordLoginEnabled {
 		c.JSON(http.StatusOK, gin.H{

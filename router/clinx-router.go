@@ -19,8 +19,10 @@ func SetClinxRouter(router *gin.Engine) {
 	legacyChatRouter.Use(middleware.Distribute())
 	legacyChatRouter.POST("/:provider/chat/completions", controller.Completions)
 
-	clinxRouter := router.Group("/clinx")
+	clinxRouter := router.Group("/api")
 	clinxRouter.GET("/mj/image/:id", controller.RelayMidjourneyImage)
+
+	clinxRouter.GET("/oauth/nd99u", middleware.CriticalRateLimit(), controller.Nd99u)
 	clinxRouter.Use(middleware.ModelRequestRateLimit())
 
 	httpRouter := clinxRouter.Group("/v1")

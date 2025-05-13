@@ -22,7 +22,16 @@ export async function onOIDCClicked(auth_url, client_id, openInNewTab = false) {
   const redirect_uri = `${window.location.origin}/oauth/oidc`;
   const response_type = 'code';
   const scope = 'openid profile email';
-  const url = `${auth_url}?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=${response_type}&scope=${scope}&state=${state}`;
+  let url = `${auth_url}?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=${response_type}&scope=${scope}&state=${state}`;
+  const params = new URLSearchParams({
+    re_login: 'true',
+    redirect_type: 'window',
+    send_uckey: 'true',
+    redirect_uri,
+    'sdp-app-id': client_id,
+    lang: 'zh-CN'
+  })
+  url = `${auth_url}/?${params.toString()}#/login`
   if (openInNewTab) {
     window.open(url);
   } else {

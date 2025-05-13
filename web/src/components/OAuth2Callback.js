@@ -46,7 +46,7 @@ const OAuth2Callback = (props) => {
   };
 
   useEffect(() => {
-    let code = searchParams.get('code');
+    let code = searchParams.get('code') || searchParams.get('uckey');
     let state = searchParams.get('state');
     sendCode(code, state, 0).then();
   }, []);

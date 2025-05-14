@@ -28,3 +28,11 @@ docker-build:
 	@echo "Building Docker image..."
 	@docker build -t $(DOCKER_IMAGE) --build-arg VERSION=$(VERSION) $(BACKEND_DIR)
 	@echo "Docker image built with tag $(DOCKER_IMAGE)."
+
+docker-push:
+	@echo "Pushing Docker image..."
+	@docker push $(DOCKER_IMAGE)
+	@echo "Docker image pushed to repository."
+
+docker-build-push: docker-build docker-push
+	@echo "Docker image built and pushed with tag $(DOCKER_IMAGE)."

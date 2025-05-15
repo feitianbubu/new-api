@@ -144,3 +144,11 @@ services:
       AUTH_SECRET_ERROR_COUNT: 3
       #爆破：验证停留时间 单位分钟 注意: vercel 不支持
       AUTH_SECRET_ERROR_TIME: 10
+
+  midjourney-proxy:
+    image: novicezk/midjourney-proxy:2.6.3
+    restart: always
+    ports:
+      - 8380:8080
+    volumes:
+      - ./midjourney-proxy:/home/spring/config

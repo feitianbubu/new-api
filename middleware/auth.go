@@ -190,6 +190,21 @@ func TokenAuth() func(c *gin.Context) {
 				c.Request.Header.Set("Authorization", "Bearer "+skKey)
 			}
 		}
+		// todo 兼容登录用户和apiKey用户调用 后期优化判断
+		if len(c.Request.Header.Get("Authorization")) != 58 {
+			session := sessions.Default(c)
+			id := session.Get("id")
+			if id != nil {
+				group, ok := session.Get("group").(string)
+				if ok {
+					c.Set("user_group", group)
+					c.Set("token_name", "playground-"+group)
+				}
+				authHelper(c, common.RoleCommonUser)
+				return
+			}
+		}
+
 		key := c.Request.Header.Get("Authorization")
 		parts := make([]string, 0)
 		key = strings.TrimPrefix(key, "Bearer ")

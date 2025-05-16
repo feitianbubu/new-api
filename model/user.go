@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang-jwt/jwt"
 	"one-api/common"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
@@ -817,4 +819,65 @@ func RootUserExists() bool {
 		return false
 	}
 	return true
+}
+
+func CreateUserJWT(u *User) (string, error) {
+	if u == nil {
+		return "", fmt.Errorf("user is nil")
+	}
+	expirationTime := time.Now().Add(24 * time.Hour)
+
+	claims := jwt.MapClaims{
+		"user_id":  u.Id,
+		"username": u.Username,
+		"role":     u.Role,
+		"exp":      expirationTime.Unix(),
+		"iat":      time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString([]byte(common.CryptoSecret))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func ParseUserJWT(tokenString string) (*User, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(common.CryptoSecret), nil
+	})
+
+	if err != nil {
+		common.SysLog("failed to parse token: " + err.Error() + " token: " + tokenString)
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		user := &User{}
+		if userID, ok := claims["user_id"].(float64); ok {
+			user.Id = int(userID)
+		} else {
+			return nil, fmt.Errorf("invalid user_id in token")
+		}
+		if username, ok := claims["username"].(string); ok {
+			user.Username = username
+		} else {
+			return nil, fmt.Errorf("invalid username in token")
+		}
+		if role, ok := claims["role"].(float64); ok {
+			user.Role = int(role)
+		} else {
+			return nil, fmt.Errorf("invalid role in token")
+		}
+
+		return user, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
 }

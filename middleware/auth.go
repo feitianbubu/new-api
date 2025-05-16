@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"fmt"
+	"github.com/pkg/errors"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
@@ -190,20 +192,6 @@ func TokenAuth() func(c *gin.Context) {
 				c.Request.Header.Set("Authorization", "Bearer "+skKey)
 			}
 		}
-		// todo 兼容登录用户和apiKey用户调用 后期优化判断
-		if len(c.Request.Header.Get("Authorization")) != 58 {
-			session := sessions.Default(c)
-			id := session.Get("id")
-			if id != nil {
-				group, ok := session.Get("group").(string)
-				if ok {
-					c.Set("user_group", group)
-					c.Set("token_name", "playground-"+group)
-				}
-				authHelper(c, common.RoleCommonUser)
-				return
-			}
-		}
 
 		key := c.Request.Header.Get("Authorization")
 		parts := make([]string, 0)
@@ -214,21 +202,34 @@ func TokenAuth() func(c *gin.Context) {
 			key = strings.TrimPrefix(key, "sk-")
 			parts = strings.Split(key, "-")
 			key = parts[0]
-		} else {
+		} else if strings.HasPrefix(key, "sk-") {
 			key = strings.TrimPrefix(key, "sk-")
 			parts = strings.Split(key, "-")
 			key = parts[0]
 		}
 		token, err := model.ValidateUserToken(key)
+		if err != nil {
+			u, jwtErr := model.ParseUserJWT(key)
+			if jwtErr != nil {
+				abortWithOpenAiMessage(c, http.StatusUnauthorized, errors.Wrapf(jwtErr, err.Error()).Error())
+				return
+			}
+			token = &model.Token{
+				UserId:         u.Id,
+				Key:            key,
+				Name:           fmt.Sprintf("access-token"),
+				UnlimitedQuota: true,
+				RemainQuota:    -1,
+				Status:         common.TokenStatusEnabled,
+				ExpiredTime:    -1,
+				Group:          u.Group,
+			}
+		}
 		if token != nil {
 			id := c.GetInt("id")
 			if id == 0 {
 				c.Set("id", token.UserId)
 			}
-		}
-		if err != nil {
-			abortWithOpenAiMessage(c, http.StatusUnauthorized, err.Error())
-			return
 		}
 		userCache, err := model.GetUserCache(token.UserId)
 		if err != nil {

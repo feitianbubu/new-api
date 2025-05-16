@@ -96,6 +96,11 @@ func setupLogin(user *model.User, c *gin.Context) {
 		Status:      user.Status,
 		Group:       user.Group,
 	}
+	if accessToken, err := model.CreateUserJWT(user); err == nil {
+		cleanUser.AccessToken = &accessToken
+	} else {
+		common.SysLog("failed to create user jwt: " + err.Error())
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,

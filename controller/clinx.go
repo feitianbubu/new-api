@@ -162,6 +162,35 @@ func Nd99u(c *gin.Context) {
 	OidcAuth(c)
 }
 
+// CheckToken
+// @Summary 检查认证
+// @Description 检查认证
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "用户认证令牌 (Aeess-Token: sk-xxxx)" example(Access-Token: sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
+// @Router /api/checkToken [get]
+// @Success 200 {object} model.User "用户信息"
+// @Router /api/checkToken [get]
+func CheckToken(c *gin.Context) {
+	accessToken := c.Request.Header.Get("Authorization")
+	if accessToken == "" {
+		Fail(c, "empty token")
+		return
+	}
+	user, err := model.ParseUserJWT(accessToken)
+	if err != nil {
+		Fail(c, "invalid token")
+		return
+	}
+	if user, err = model.GetUserById(user.Id, false); err != nil {
+		Fail(c, "user not found")
+		return
+	}
+	Success(c, user.ToBaseUser())
+	return
+}
+
 type Response struct {
 	Code int         `json:"code"`
 	Data interface{} `json:"data"`

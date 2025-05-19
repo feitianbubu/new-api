@@ -23,6 +23,7 @@ func SetClinxRouter(router *gin.Engine) {
 	clinxRouter.GET("/mj/image/:id", controller.RelayMidjourneyImage)
 
 	clinxRouter.GET("/oauth/nd99u", middleware.CriticalRateLimit(), controller.Nd99u)
+	clinxRouter.GET("/checkToken", middleware.CriticalRateLimit(), controller.CheckToken)
 	clinxRouter.Use(middleware.ModelRequestRateLimit())
 
 	httpRouter := clinxRouter.Group("/v1")

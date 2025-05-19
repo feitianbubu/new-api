@@ -1,7 +1,7 @@
 FRONTEND_DIR = ./web
 BACKEND_DIR = .
-COMMIT_ID?=$(shell git rev-parse --short HEAD)
-VERSION?=v0.0.1-${COMMIT_ID}
+COMMIT_ID?=$(git describe --tags --always --dirty)
+VERSION?=${COMMIT_ID}-$(shell date +%Y%m%d%H%M)
 DOCKER_VERSION=latest
 DOCKER_IMAGE=skynono/clinx:${DOCKER_VERSION}
 
@@ -34,5 +34,10 @@ docker-push:
 	@docker push $(DOCKER_IMAGE)
 	@echo "Docker image pushed to repository."
 
-docker-build-push: docker-build docker-push
+docker-build-push: swag docker-build docker-push
 	@echo "Docker image built and pushed with tag $(DOCKER_IMAGE)."
+
+mcp:
+	@echo "start mcp server..."
+	npx @agentdeskai/browser-tools-server@latest
+	@echo "mcp server started."

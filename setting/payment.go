@@ -13,3 +13,9 @@ var AlipayAppId = ""
 var AlipayPrivateKey = ""
 var AlipayPublicKey = ""
 var AlipayProductionEnabled = false
+
+var NDPayBaseUrl = ""
+var NDPayAppId = ""
+var NDPayAppKey = ""
+var NDPayNotifyUrl = ""
+var NDPayEnabled = false

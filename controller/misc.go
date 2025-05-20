@@ -65,7 +65,7 @@ func GetStatus(c *gin.Context) {
 			"enable_data_export":          common.DataExportEnabled,
 			"data_export_default_time":    common.DataExportDefaultTime,
 			"default_collapse_sidebar":    common.DefaultCollapseSidebar,
-			"enable_online_topup":         setting.AlipayEnabled || setting.EpayEnabled,
+			"enable_online_topup":         setting.AlipayEnabled || setting.EpayEnabled || setting.NDPayEnabled,
 			"alipay_enabled":              setting.AlipayEnabled,
 			"epay_enabled":                setting.EpayEnabled,
 			"mj_notify_enabled":           setting.MjNotifyEnabled,
@@ -76,6 +76,7 @@ func GetStatus(c *gin.Context) {
 			"oidc_client_id":              system_setting.GetOIDCSettings().ClientId,
 			"oidc_authorization_endpoint": system_setting.GetOIDCSettings().AuthorizationEndpoint,
 			"setup":                       constant.Setup,
+			"ndpay_enabled":               setting.NDPayEnabled,
 		},
 	})
 	return

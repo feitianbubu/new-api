@@ -228,3 +228,10 @@ func Fail(c *gin.Context, msg string) {
 		Msg:  msg,
 	})
 }
+func CommonResponse(c *gin.Context, data interface{}, err error) {
+	if err != nil {
+		Fail(c, err.Error())
+		return
+	}
+	Success(c, data)
+}

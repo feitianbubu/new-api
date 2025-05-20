@@ -166,6 +166,7 @@ func main() {
 		go common.Monitor()
 		common.SysLog("pprof enabled")
 	}
+	gopool.Go(controller.CheckUnPaidOrders)
 
 	// Initialize HTTP server
 	server := gin.New()

@@ -123,13 +123,14 @@ func InitOptionMap() {
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 
-	// 支付宝配置
+	// 支付配置
 	common.OptionMap["AlipayEnabled"] = strconv.FormatBool(setting.AlipayEnabled)
 	common.OptionMap["AlipayAppId"] = setting.AlipayAppId
 	common.OptionMap["AlipayPrivateKey"] = setting.AlipayPrivateKey
 	common.OptionMap["AlipayPublicKey"] = setting.AlipayPublicKey
 	common.OptionMap["AlipayProductionEnabled"] = strconv.FormatBool(setting.AlipayProductionEnabled)
 	common.OptionMap["EpayEnabled"] = strconv.FormatBool(setting.EpayEnabled)
+	common.OptionMap["NDPayEnabled"] = strconv.FormatBool(setting.NDPayEnabled)
 
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
@@ -270,6 +271,12 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.WorkerAllowHttpImageRequestEnabled = boolValue
 		case "AlipayProductionEnabled":
 			setting.AlipayProductionEnabled = boolValue
+		case "NDPayEnabled":
+			setting.NDPayEnabled = boolValue
+		case "AlipayEnabled":
+			setting.AlipayEnabled = boolValue
+		case "EpayEnabled":
+			setting.EpayEnabled = boolValue
 		}
 	}
 	switch key {
@@ -388,16 +395,20 @@ func updateOptionMap(key string, value string) (err error) {
 		operation_setting.AutomaticDisableKeywordsFromString(value)
 	case "StreamCacheQueueLength":
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
-	case "AlipayEnabled":
-		setting.AlipayEnabled = value == "true"
 	case "AlipayAppId":
 		setting.AlipayAppId = value
 	case "AlipayPrivateKey":
 		setting.AlipayPrivateKey = value
 	case "AlipayPublicKey":
 		setting.AlipayPublicKey = value
-	case "EpayEnabled":
-		setting.EpayEnabled = value == "true"
+	case "NDPayNotifyUrl":
+		setting.NDPayNotifyUrl = value
+	case "NDPayBaseUrl":
+		setting.NDPayBaseUrl = value
+	case "NDPayAppId":
+		setting.NDPayAppId = value
+	case "NDPayAppKey":
+		setting.NDPayAppKey = value
 	}
 	return err
 }

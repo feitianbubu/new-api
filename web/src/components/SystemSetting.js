@@ -80,6 +80,11 @@ const SystemSetting = () => {
     AlipayPublicKey: '',
     AlipayProductionEnabled: false,
     EpayEnabled: false,
+    NDPayBaseUrl: '',
+    NDPayAppId: '',
+    NDPayAppKey: '',
+    NDPayNotifyUrl: '',
+    NDPayEnabled: false,
   });
 
   const [originInputs, setOriginInputs] = useState({});
@@ -134,6 +139,12 @@ const SystemSetting = () => {
         }
         newInputs[item.key] = item.value;
       });
+      // 兼容后端未返回时的默认值
+      newInputs.NDPayBaseUrl = newInputs.NDPayBaseUrl || '';
+      newInputs.NDPayAppId = newInputs.NDPayAppId || '';
+      newInputs.NDPayAppKey = newInputs.NDPayAppKey || '';
+      newInputs.NDPayNotifyUrl = newInputs.NDPayNotifyUrl || '';
+      newInputs.NDPayEnabled = typeof newInputs.NDPayEnabled === 'boolean' ? newInputs.NDPayEnabled : (newInputs.NDPayEnabled === 'true');
       setInputs(newInputs);
       setOriginInputs(newInputs);
       if (formApiRef.current) {
@@ -282,6 +293,20 @@ const SystemSetting = () => {
 
     // 添加易支付启用状态
     options.push({ key: 'EpayEnabled', value: inputs.EpayEnabled.toString() });
+
+    if (inputs.NDPayBaseUrl !== '') {
+      options.push({ key: 'NDPayBaseUrl', value: inputs.NDPayBaseUrl });
+    }
+    if (inputs.NDPayAppId !== '') {
+      options.push({ key: 'NDPayAppId', value: inputs.NDPayAppId });
+    }
+    if (inputs.NDPayAppKey !== undefined && inputs.NDPayAppKey !== '') {
+      options.push({ key: 'NDPayAppKey', value: inputs.NDPayAppKey });
+    }
+    if (inputs.NDPayNotifyUrl !== '') {
+      options.push({ key: 'NDPayNotifyUrl', value: inputs.NDPayNotifyUrl });
+    }
+    options.push({ key: 'NDPayEnabled', value: inputs.NDPayEnabled.toString() });
 
     await updateOptions(options);
   };
@@ -738,6 +763,57 @@ const SystemSetting = () => {
                         field='MinTopUp'
                         label='最低充值美元数量'
                         placeholder='例如：2，就是最低充值2$'
+                      />
+                    </Col>
+                  </Row>
+                  <Divider>ND支付配置</Divider>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='NDPayBaseUrl'
+                        label='BaseUrl'
+                        placeholder='例如：http://zhifu.99.com/sdp/paysdk/chargev2'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='NDPayAppId'
+                        label='AppId'
+                        placeholder='例如：1970'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='NDPayAppKey'
+                        label='AppKey'
+                        placeholder='例如：530e19e39285fef3be17cfe48c6c2cb4'
+                        type='password'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Input
+                        field='NDPayNotifyUrl'
+                        label='NotifyUrl'
+                        placeholder='例如：https://yourdomain.com/notify'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+                      <Form.Switch
+                        field='NDPayEnabled'
+                        label='启用ND支付'
                       />
                     </Col>
                   </Row>

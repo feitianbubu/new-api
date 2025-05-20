@@ -39,6 +39,10 @@ const TopUp = () => {
   const [payWay, setPayWay] = useState('');
   const [alipayEnabled, setAlipayEnabled] = useState(false);
   const [epayEnabled, setEpayEnabled] = useState(false);
+  const [ndpayEnabled, setNDPayEnabled] = useState(false);
+  const [ndpayQrUrl, setNDPayQrUrl] = useState('');
+  const [tradeNo, setTradeNo] = useState('');
+  const [pollingIntervalId, setPollingIntervalId] = useState(null);
 
   const topUp = async () => {
     if (redemptionCode === '') {
@@ -92,6 +96,7 @@ const TopUp = () => {
     }
     setPayWay(payment);
     setOpen(true);
+    setNDPayQrUrl('');
   };
 
   const onlineTopUp = async () => {
@@ -113,6 +118,29 @@ const TopUp = () => {
         const { message, data } = res.data;
         // showInfo(message);
         if (message === 'success') {
+          if (payWay === 'ndpay') {
+            const ndpayUrl = data?.PayParams;
+            setNDPayQrUrl(ndpayUrl);
+            setOpen(false);
+            Modal.info({
+              title: t('请扫码支付'),
+              content: (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <iframe src={ndpayUrl} title='ND支付二维码' style={{width: 155, height: 155, border: 'none'}} />
+                </div>
+              ),
+              centered: true,
+              maskClosable: true,
+            });
+            const tradeNo = data?.OrderNo;
+            if (tradeNo) {
+              setTradeNo(tradeNo);
+              startPollingOrderStatus(tradeNo);
+            } else {
+              showError("tradeNo is undefined");
+            }
+            return;
+          }
           let params = data;
           let url = res.data.url;
           // 如果是支付宝官方支付，直接跳转
@@ -184,8 +212,17 @@ const TopUp = () => {
       if (status.epay_enabled) {
           setEpayEnabled(status.epay_enabled);
       }
+      if (status.ndpay_enabled) {
+        setNDPayEnabled(status.ndpay_enabled);
+      }
     }
     getUserQuota().then();
+
+    return () => {
+        if (pollingIntervalId) {
+            clearInterval(pollingIntervalId);
+        }
+    };
   }, []);
 
   const renderAmount = () => {
@@ -224,6 +261,35 @@ const TopUp = () => {
 
   const handleCancel = () => {
     setOpen(false);
+  };
+
+  const startPollingOrderStatus = (orderTradeNo) => {
+      const interval = setInterval(async () => {
+          console.log(`Polling status for order: ${orderTradeNo}`);
+          try {
+              const res = await API.get(`/api/checkPendingOrder?tradeNo=${orderTradeNo}`);
+              const { code, message, data } = res.data;
+
+              if (code === 0) {
+                if (data?.status === 'success') {
+                  // Payment successful
+                  showSuccess(t('支付成功！'));
+                  clearInterval(interval);
+                  setPollingIntervalId(null);
+                  setOpen(false);
+                  getUserQuota();
+                }
+              } else {
+                  showError(`checkPendingOrder fail : ${message || data}`);
+                  clearInterval(interval);
+                  setPollingIntervalId(null);
+              }
+          } catch (err) {
+              console.error("Error polling order status:", err);
+          }
+      }, 5000);
+
+      setPollingIntervalId(interval);
   };
 
   return (
@@ -347,6 +413,17 @@ const TopUp = () => {
                         theme={'solid'}
                         onClick={async () => {
                           preTopUp('alipay');
+                        }}
+                      >
+                        {t('支付宝')}
+                      </Button>
+                    )}
+                    {ndpayEnabled && (
+                      <Button
+                        type={'primary'}
+                        theme={'solid'}
+                        onClick={async () => {
+                          preTopUp('ndpay');
                         }}
                       >
                         {t('支付宝')}

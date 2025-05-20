@@ -24,6 +24,7 @@ func SetClinxRouter(router *gin.Engine) {
 
 	clinxRouter.GET("/oauth/nd99u", middleware.CriticalRateLimit(), controller.Nd99u)
 	clinxRouter.GET("/checkToken", middleware.CriticalRateLimit(), controller.CheckToken)
+	clinxRouter.GET("/checkPendingOrder", controller.CheckPendingOrder)
 	clinxRouter.Use(middleware.ModelRequestRateLimit())
 
 	httpRouter := clinxRouter.Group("/v1")

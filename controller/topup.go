@@ -61,7 +61,13 @@ func getPayMoney(amount int64, group string) float64 {
 
 	payMoney := dAmount.Mul(dPrice).Mul(dTopupGroupRatio)
 
-	return payMoney.InexactFloat64()
+	return payMoney.RoundCeil(2).InexactFloat64()
+}
+func getAmountDecimal(payMoney float64, group string) decimal.Decimal {
+	dAmount := decimal.NewFromFloat(payMoney)
+	dTopupGroupRatio := decimal.NewFromFloat(common.GetTopupGroupRatio(group))
+	dPrice := decimal.NewFromFloat(setting.Price)
+	return dAmount.Div(dPrice).Div(dTopupGroupRatio)
 }
 
 func getMinTopup() int64 {
@@ -74,6 +80,16 @@ func getMinTopup() int64 {
 	return int64(minTopup)
 }
 
+// RequestEpay
+// @Summary 创建订单
+// @Description 支付前获取服务端订单参数
+// @Tags 充值
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body controller.EpayRequest true "充值请求体"
+// @Success 200 {object} map[string]interface{} "返回支付参数或支付链接，失败时返回错误信息"
+// @Router /api/user/pay [post]
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
@@ -120,6 +136,25 @@ func RequestEpay(c *gin.Context) {
 		}
 
 		c.JSON(200, gin.H{"message": "success", "data": payUrl, "url": payUrl})
+		return
+	}
+
+	// 处理nd支付
+	if req.PaymentMethod == "ndpay" {
+		data, err := service.CreateNdOrder(service.NdOrderReq{
+			UserId:    id,
+			Username:  c.GetString("username"),
+			PaySource: 3,
+			Channel:   NdDefaultChannel,
+			Amount:    req.Amount,
+			Money:     payMoney,
+			Currency:  "CNY",
+			Subject:   "pay",
+			Body:      "nd pay",
+			ClientIp:  c.ClientIP(),
+			TradeNo:   tradeNo,
+		})
+		CommonResponse(c, data, err)
 		return
 	}
 	client := GetEpayClient()

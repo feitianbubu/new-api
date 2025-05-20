@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type TopUp struct {
 	Id         int     `json:"id"`
 	UserId     int     `json:"user_id" gorm:"index"`
@@ -40,4 +42,15 @@ func GetTopUpByTradeNo(tradeNo string) *TopUp {
 		return nil
 	}
 	return topUp
+}
+
+func GetTopUpByStatusRecent(status string, recent time.Duration) []*TopUp {
+	var topUps []*TopUp
+	var err error
+	createTime := time.Now().Add(-recent).Unix()
+	err = DB.Where("status = ? and create_time > ?", status, createTime).Find(&topUps).Error
+	if err != nil {
+		return nil
+	}
+	return topUps
 }

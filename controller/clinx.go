@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
@@ -180,7 +179,7 @@ func CheckToken(c *gin.Context) {
 	}
 	user, err := model.ParseUserJWT(accessToken)
 	if err != nil {
-		Fail(c, "invalid token")
+		Fail(c, err.Error())
 		return
 	}
 	if user, err = model.GetUserById(user.Id, false); err != nil {
@@ -192,40 +191,35 @@ func CheckToken(c *gin.Context) {
 }
 
 type Response struct {
-	Code int         `json:"code"`
-	Data interface{} `json:"data"`
-	Msg  string      `json:"msg"`
+	Code    int         `json:"code"`
+	Data    interface{} `json:"data"`
+	Message string      `json:"message"`
+	Msg     string      `json:"msg"` // for legacy api, will remove later
 }
 
 func Success(c *gin.Context, data interface{}) {
-	common.SysLog(fmt.Sprintf("Success: %+v", data))
 	c.JSON(http.StatusOK, Response{
-		Code: 0,
-		Data: data,
-		Msg:  "success",
+		Code:    0,
+		Data:    data,
+		Message: "success",
+		Msg:     "success",
 	})
 }
 func SuccessPage(c *gin.Context, data []any) {
-	common.SysLog(fmt.Sprintf("SuccessPage: %+v", data))
 	type PageResult struct {
 		List  interface{} `json:"list"`
 		Total int64       `json:"total"`
 	}
-	c.JSON(http.StatusOK, Response{
-		Code: 0,
-		Data: PageResult{
-			List:  data,
-			Total: int64(len(data)),
-		},
-		Msg: "success",
+	Success(c, PageResult{
+		List:  data,
+		Total: int64(len(data)),
 	})
 }
 func Fail(c *gin.Context, msg string) {
-	common.SysLog(fmt.Sprintf("Fail: %s", msg))
 	c.JSON(http.StatusOK, Response{
-		Code: 10000,
-		Data: nil,
-		Msg:  msg,
+		Code:    10000,
+		Data:    nil,
+		Message: msg,
 	})
 }
 func CommonResponse(c *gin.Context, data interface{}, err error) {

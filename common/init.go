@@ -71,6 +71,7 @@ func LoadEnv() {
 
 	// Initialize variables from constants.go that were using environment variables
 	DebugEnabled = os.Getenv("DEBUG") == "true"
+	SqlLogEnabled = os.Getenv("SQL_LOG_ENABLED") == "true"
 	MemoryCacheEnabled = os.Getenv("MEMORY_CACHE_ENABLED") == "true"
 	ResponseLogEnabled = os.Getenv("RESPONSE_LOG_ENABLED") == "true"
 	IsMasterNode = os.Getenv("NODE_TYPE") != "slave"

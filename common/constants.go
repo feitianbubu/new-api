@@ -77,6 +77,7 @@ var EmailLoginAuthServerList = []string{
 }
 
 var DebugEnabled bool
+var SqlLogEnabled bool
 var MemoryCacheEnabled bool
 var ResponseLogEnabled bool
 

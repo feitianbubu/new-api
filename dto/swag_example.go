@@ -1,7 +1,7 @@
 package dto
 
 type ExampleGeneralOpenAIRequest struct {
-	Model    string `json:"model" example:"qwen2.5:7b"`
+	Model    string `json:"model" example:"gpt-4.1"`
 	Messages []struct {
 		Role    string `json:"role" example:"user"`
 		Content string `json:"content" example:"你是?"`

@@ -11,12 +11,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ModelList
+// ModelListLegacy
+// Deprecated
+// compatible with legacy API to be removed in future
 // @Tags Clinx
-// @Summary 模型列表
+// @Summary 模型列表_旧接口_下版本移除
 // @Produce application/json
 // @Router /providers/modelsList/{provider} [get]
-func ModelList(c *gin.Context) {
+func ModelListLegacy(c *gin.Context) {
 	channelId, _ := strconv.Atoi(c.Param("provider"))
 	enableAbilities := model.GetAllEnableAbilities()
 	type ModelVo struct {
@@ -46,6 +48,50 @@ func ModelList(c *gin.Context) {
 	SuccessPage(c, data)
 }
 
+// ModelList
+// @Tags Clinx
+// @Summary 模型列表
+// @Description 获取模型列表
+// @Param tag query string false "模型标签: llm/embedding/image/video" example(llm)
+// @Produce application/json
+// @Router /providers/modelsList [get]ag
+func ModelList(c *gin.Context) {
+	tag := c.Query("tag")
+	//channelId, _ := strconv.Atoi(c.Param("provider"))
+	enableAbilities := model.GetAllEnableAbilities()
+	type ModelVo struct {
+		Provider  string  `json:"provider"`
+		Model     string  `json:"model_name"`
+		ModelType *string `json:"model_type"`
+	}
+	mapData := make(map[string]ModelVo) //map[string]ModelVo
+	var data []any
+	for _, ability := range enableAbilities {
+		//if channelId != 0 && ability.ChannelId != channelId {
+		//	continue
+		//}
+		if tag != "" && ability.Tag != nil && *ability.Tag != tag {
+			continue
+		}
+		//modelType := ""
+		//if ability.Tag != nil {
+		//	modelType = *ability.Tag
+		//}
+		name := ability.Model
+		if _, ok := mapData[name]; ok {
+			continue
+		}
+		v := ModelVo{
+			Provider:  strconv.Itoa(ability.ChannelId),
+			Model:     ability.Model,
+			ModelType: ability.Tag,
+		}
+		mapData[name] = v
+		data = append(data, v)
+	}
+	SuccessPage(c, data)
+}
+
 // Completions
 // @Summary      模型对话
 // @Description  接收符合 OpenAI API 格式的文本或聊天补全请求
@@ -53,7 +99,7 @@ func ModelList(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Produce      text/event-stream
-// @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-4No9laxl9cLoEDsPbF2vKpQ7MOVp4FHgXE3Br4zpoNq98Ldm)
+// @Param        Authorization header string true "用户认证令牌 (Bearer sk-xxxx)" example(Bearer sk-t8uP8tR6EhrmVgTijsf5HzMrr5KGE0BYCFTtSh4sk2GCXNZN)
 // @Param        request body dto.GeneralOpenAIRequest true "OpenAI 请求体"
 // @Success      200 {object} dto.OpenAITextResponse "非流式响应"
 // @Success      200 {string} string "流式响应 (text/event-stream)"

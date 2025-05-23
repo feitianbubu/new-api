@@ -40,7 +40,7 @@ var indexPage []byte
 // @description                * 支持按用户计费和充值
 // @description
 // @description                # 使用说明
-// @description                1. 访问: https://newapi.clinx.work
+// @description                1. 访问: https://dev.clinx.work
 // @description                1. 注册用户,生成ApiKey令牌,新用户有免费试用额度
 // @description                2. 根据模型列表获取可用的模型列表
 // @description                3. 根据模型调用大模型接口

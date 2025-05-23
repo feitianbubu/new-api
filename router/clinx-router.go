@@ -12,7 +12,7 @@ func SetClinxRouter(router *gin.Engine) {
 
 	legacyRouter := router.Group("")
 	legacyRouter.GET("/providers/providersList", controller.ProvidersList)
-	legacyRouter.GET("/providers/modelsList/:provider", controller.ModelList)
+	legacyRouter.GET("/providers/modelsList/:provider", controller.ModelListLegacy)
 	legacyRouter.GET("/providers/modelsList", controller.ModelList)
 	legacyChatRouter := router.Group("/v1/openai")
 	legacyChatRouter.Use(middleware.TokenAuth())
@@ -23,7 +23,7 @@ func SetClinxRouter(router *gin.Engine) {
 	clinxRouter.GET("/mj/image/:id", controller.RelayMidjourneyImage)
 
 	clinxRouter.GET("/oauth/nd99u", middleware.CriticalRateLimit(), controller.Nd99u)
-	clinxRouter.GET("/checkToken", middleware.CriticalRateLimit(), controller.CheckToken)
+	clinxRouter.GET("/checkToken", controller.CheckToken)
 	clinxRouter.GET("/checkPendingOrder", controller.CheckPendingOrder)
 	clinxRouter.Use(middleware.ModelRequestRateLimit())
 

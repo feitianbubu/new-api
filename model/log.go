@@ -42,6 +42,13 @@ const (
 	LogTypeManage
 	LogTypeSystem
 	LogTypeError
+	LogTypeReserve1
+	LogTypeReserve2
+	LogTypeReserve3
+	LogTypeReserve4
+	LogTypeReserve5
+	LogTypeLogin
+	LogTypeLogout
 )
 
 func formatUserLogs(logs []*Log) {
@@ -70,6 +77,29 @@ func GetLogByKey(key string) (logs []*Log, err error) {
 	}
 	formatUserLogs(logs)
 	return logs, err
+}
+
+func RecordSystemLog(c *gin.Context, userId int, logType int, content string) {
+	if !common.LogConsumeEnabled {
+		return
+	}
+	username, _ := GetUsernameById(userId, false)
+	log := &Log{
+		UserId:    userId,
+		Username:  username,
+		CreatedAt: common.GetTimestamp(),
+		Type:      logType,
+		Content:   content,
+	}
+	if ip := c.ClientIP(); ip != "" {
+		log.Other = common.MapToJsonStr(map[string]any{
+			"ip": ip,
+		})
+	}
+	err := LOG_DB.Create(log).Error
+	if err != nil {
+		common.SysError("failed to record login log: " + err.Error())
+	}
 }
 
 func RecordLog(userId int, logType int, content string) {

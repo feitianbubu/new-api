@@ -101,6 +101,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 	} else {
 		common.SysLog("failed to create user jwt: " + err.Error())
 	}
+	model.RecordSystemLog(c, user.Id, model.LogTypeLogin, fmt.Sprintf("用户 %s 登录成功", user.Username))
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
@@ -110,6 +111,10 @@ func setupLogin(user *model.User, c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	if userId, ok := session.Get("id").(int); ok {
+		username, _ := session.Get("username").(string)
+		model.RecordSystemLog(c, userId, model.LogTypeLogout, fmt.Sprintf("用户 %s 登出成功", username))
+	}
 	session.Clear()
 	err := session.Save()
 	if err != nil {

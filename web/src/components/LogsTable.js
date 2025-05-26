@@ -109,6 +109,18 @@ const LogsTable = () => {
             {t('错误')}
           </Tag>
         );
+      case 11:
+        return (
+          <Tag color='green' size='large'>
+            {t('登录')}
+          </Tag>
+        );
+      case 12:
+        return (
+          <Tag color='yellow' size='large'>
+            {t('登出')}
+          </Tag>
+        );
       default:
         return (
           <Tag color='grey' size='large'>

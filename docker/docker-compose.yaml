@@ -23,7 +23,29 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
-
+  mysql:
+    image: mysql:8.0.41
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-clinx}
+    command:
+      --slow-query-log=1
+      --long-query-time=2
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/config:/etc/mysql/conf.d
+      - ./initdb:/docker-entrypoint-initdb.d
+    ports:
+      - 3307:3306
+    env_file:
+      - .env
   # The redis cache.
   redis:
     image: redis:6-alpine
@@ -85,7 +107,7 @@ services:
     image: skynono/clinx:latest
     restart: always
     depends_on:
-      - db
+      - mysql
       - redis
     env_file:
       - .env
@@ -99,11 +121,11 @@ services:
     environment:
       TZ: Asia/Shanghai # 指定时区
       # 必选
-      OPENAI_API_KEY: sk-xLkrouD5xCNKnRXAUlnoC0FwW8xo4uBKaC67kN84wHWikB1X
+      OPENAI_API_KEY:
       # API接口地址，可选，设置 OPENAI_API_KEY 时可用
       OPENAI_API_BASE_URL: https://dev.clinx.work
       # API模型，可选，设置 OPENAI_API_KEY 时可用
-      OPENAI_API_MODEL: gpt-4o-mini
+      OPENAI_API_MODEL: gpt-4.1
       # 访问权限密钥，可选
       AUTH_SECRET_KEY:
       # midjourney 服务器地址，可选 可用下面的 http://midjourney-proxy:8080

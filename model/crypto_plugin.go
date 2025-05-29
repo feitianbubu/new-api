@@ -104,7 +104,7 @@ func processStructCryptoFields(val reflect.Value, encrypt bool) error {
 	return nil
 }
 func cryptoWhere(db *gorm.DB, field, value string) *gorm.DB {
-	s, ok := getCryptoStrategy("aes")
+	s, ok := getCryptoStrategy(defaultCryptoStrategy)
 	if !ok {
 		return db.Where(field+" = ?", value)
 	}

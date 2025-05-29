@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"gorm.io/gorm"
 	"one-api/common"
 	"strings"
 	"sync"
@@ -9,6 +11,7 @@ import (
 type CryptoStrategy interface {
 	Encrypt(plain string) (string, error)
 	Decrypt(cipher string) (string, error)
+	Name() string
 }
 
 var (
@@ -16,10 +19,16 @@ var (
 	cryptoMu         sync.RWMutex
 )
 
-func RegisterCryptoStrategy(name string, strategy CryptoStrategy) {
+func RegisterGormCryptoStrategyAES(db *gorm.DB) error {
+	strategy := AesCryptoStrategy{}
+	RegisterCryptoStrategy(strategy)
+	return RegisterCryptoPlugin(db)
+}
+
+func RegisterCryptoStrategy(strategy CryptoStrategy) {
 	cryptoMu.Lock()
 	defer cryptoMu.Unlock()
-	cryptoStrategies[name] = strategy
+	cryptoStrategies[strategy.Name()] = strategy
 }
 
 func getCryptoStrategy(name string) (CryptoStrategy, bool) {
@@ -29,20 +38,27 @@ func getCryptoStrategy(name string) (CryptoStrategy, bool) {
 	return s, ok
 }
 
+const defaultCryptoStrategy = "aes"
+
 type AesCryptoStrategy struct{}
 
-const aesPrefix = "{AES}"
-
-func (AesCryptoStrategy) Encrypt(plain string) (string, error) {
+func (m AesCryptoStrategy) Encrypt(plain string) (string, error) {
 	enc, err := common.EncryptAES(plain, common.SessionSecret)
 	if err != nil {
 		return "", err
 	}
-	return aesPrefix + enc, nil
+	return fmt.Sprintf("%s%s", m.prefix(), enc), nil
 }
-func (AesCryptoStrategy) Decrypt(cipher string) (string, error) {
-	if !strings.HasPrefix(cipher, aesPrefix) {
+func (m AesCryptoStrategy) Decrypt(cipher string) (string, error) {
+	prefix := m.prefix()
+	if !strings.HasPrefix(cipher, prefix) {
 		return cipher, nil
 	}
-	return common.DecryptAES(strings.TrimPrefix(cipher, aesPrefix), common.SessionSecret)
+	return common.DecryptAES(strings.TrimPrefix(cipher, prefix), common.SessionSecret)
+}
+func (AesCryptoStrategy) Name() string {
+	return defaultCryptoStrategy
+}
+func (m AesCryptoStrategy) prefix() string {
+	return fmt.Sprintf("{%s}", strings.ToUpper(m.Name()))
 }

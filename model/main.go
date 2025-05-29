@@ -142,8 +142,9 @@ func InitDB() (err error) {
 			db = db.Debug()
 		}
 		DB = db
-		RegisterCryptoStrategy("aes", AesCryptoStrategy{})
-		RegisterCryptoPlugin(DB)
+		if err = RegisterGormCryptoStrategyAES(DB); err != nil {
+			return err
+		}
 		sqlDB, err := DB.DB()
 		if err != nil {
 			return err

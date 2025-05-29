@@ -3,9 +3,9 @@
 </p>
 <div align="center">
 
-![new-api](/web/public/logo.png)
+![clinx](/web/public/logo.png)
 
-# New API
+# Clinx
 
 🍥 Next-Generation Large Model Gateway and AI Asset Management System
 
@@ -33,16 +33,18 @@
 ## 📝 Project Description
 
 > [!NOTE]  
-> This is an open-source project developed based on [One API](https://github.com/songquanpeng/one-api)
+> This project has undergone secondary development based on [New API](https://github.com/QuantumNous/new-api)
 
 > [!IMPORTANT]  
-> - This project is for personal learning purposes only, with no guarantee of stability or technical support.
-> - Users must comply with OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use) and **applicable laws and regulations**, and must not use it for illegal purposes.
+> - The current version is for internal use by Clinx.
 > - According to the [《Interim Measures for the Management of Generative Artificial Intelligence Services》](http://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm), please do not provide any unregistered generative AI services to the public in China.
 
 ## 📚 Documentation
 
-For detailed documentation, please visit our official Wiki: [https://docs.newapi.pro/](https://docs.newapi.pro/)
+For detailed documentation, please visit: [https://dev.clinx.work/swag.html](https://dev.clinx.work/swag.html)
+
+## 🏗 Architecture
+![clinx-arch](/web/public/arch.png)
 
 ## ✨ Key Features
 
@@ -91,101 +93,3 @@ This version supports multiple models, please refer to [API Documentation-Relay 
 5. Rerank models ([Cohere](https://cohere.ai/) and [Jina](https://jina.ai/)), [API Documentation](https://docs.newapi.pro/api/jinaai-rerank)
 6. Claude Messages format, [API Documentation](https://docs.newapi.pro/api/anthropic-chat)
 7. Dify, currently only supports chatflow
-
-## Environment Variable Configuration
-
-For detailed configuration instructions, please refer to [Installation Guide-Environment Variables Configuration](https://docs.newapi.pro/installation/environment-variables):
-
-- `GENERATE_DEFAULT_TOKEN`: Whether to generate initial tokens for newly registered users, default is `false`
-- `STREAMING_TIMEOUT`: Streaming response timeout, default is 60 seconds
-- `DIFY_DEBUG`: Whether to output workflow and node information for Dify channels, default is `true`
-- `FORCE_STREAM_OPTION`: Whether to override client stream_options parameter, default is `true`
-- `GET_MEDIA_TOKEN`: Whether to count image tokens, default is `true`
-- `GET_MEDIA_TOKEN_NOT_STREAM`: Whether to count image tokens in non-streaming cases, default is `true`
-- `UPDATE_TASK`: Whether to update asynchronous tasks (Midjourney, Suno), default is `true`
-- `COHERE_SAFETY_SETTING`: Cohere model safety settings, options are `NONE`, `CONTEXTUAL`, `STRICT`, default is `NONE`
-- `GEMINI_VISION_MAX_IMAGE_NUM`: Maximum number of images for Gemini models, default is `16`
-- `MAX_FILE_DOWNLOAD_MB`: Maximum file download size in MB, default is `20`
-- `CRYPTO_SECRET`: Encryption key used for encrypting database content
-- `AZURE_DEFAULT_API_VERSION`: Azure channel default API version, default is `2025-04-01-preview`
-- `NOTIFICATION_LIMIT_DURATION_MINUTE`: Notification limit duration, default is `10` minutes
-- `NOTIFY_LIMIT_COUNT`: Maximum number of user notifications within the specified duration, default is `2`
-- `ERROR_LOG_ENABLED=true`: Whether to record and display error logs, default is `false`
-
-## Deployment
-
-For detailed deployment guides, please refer to [Installation Guide-Deployment Methods](https://docs.newapi.pro/installation):
-
-> [!TIP]
-> Latest Docker image: `calciumion/new-api:latest`
-
-### Multi-machine Deployment Considerations
-- Environment variable `SESSION_SECRET` must be set, otherwise login status will be inconsistent across multiple machines
-- If sharing Redis, `CRYPTO_SECRET` must be set, otherwise Redis content cannot be accessed across multiple machines
-
-### Deployment Requirements
-- Local database (default): SQLite (Docker deployment must mount the `/data` directory)
-- Remote database: MySQL version >= 5.7.8, PgSQL version >= 9.6
-
-### Deployment Methods
-
-#### Using BaoTa Panel Docker Feature
-Install BaoTa Panel (version **9.2.0** or above), find **New-API** in the application store and install it.
-[Tutorial with images](./docs/BT.md)
-
-#### Using Docker Compose (Recommended)
-```shell
-# Download the project
-git clone https://github.com/Calcium-Ion/new-api.git
-cd new-api
-# Edit docker-compose.yml as needed
-# Start
-docker-compose up -d
-```
-
-#### Using Docker Image Directly
-```shell
-# Using SQLite
-docker run --name new-api -d --restart always -p 3000:3000 -e TZ=Asia/Shanghai -v /home/ubuntu/data/new-api:/data calciumion/new-api:latest
-
-# Using MySQL
-docker run --name new-api -d --restart always -p 3000:3000 -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" -e TZ=Asia/Shanghai -v /home/ubuntu/data/new-api:/data calciumion/new-api:latest
-```
-
-## Channel Retry and Cache
-Channel retry functionality has been implemented, you can set the number of retries in `Settings->Operation Settings->General Settings`. It is **recommended to enable caching**.
-
-### Cache Configuration Method
-1. `REDIS_CONN_STRING`: Set Redis as cache
-2. `MEMORY_CACHE_ENABLED`: Enable memory cache (no need to set manually if Redis is set)
-
-## API Documentation
-
-For detailed API documentation, please refer to [API Documentation](https://docs.newapi.pro/api):
-
-- [Chat API](https://docs.newapi.pro/api/openai-chat)
-- [Image API](https://docs.newapi.pro/api/openai-image)
-- [Rerank API](https://docs.newapi.pro/api/jinaai-rerank)
-- [Realtime API](https://docs.newapi.pro/api/openai-realtime)
-- [Claude Chat API (messages)](https://docs.newapi.pro/api/anthropic-chat)
-
-## Related Projects
-- [One API](https://github.com/songquanpeng/one-api): Original project
-- [Midjourney-Proxy](https://github.com/novicezk/midjourney-proxy): Midjourney interface support
-- [chatnio](https://github.com/Deeptrain-Community/chatnio): Next-generation AI one-stop B/C-end solution
-- [neko-api-key-tool](https://github.com/Calcium-Ion/neko-api-key-tool): Query usage quota with key
-
-Other projects based on New API:
-- [new-api-horizon](https://github.com/Calcium-Ion/new-api-horizon): High-performance optimized version of New API
-- [VoAPI](https://github.com/VoAPI/VoAPI): Frontend beautified version based on New API
-
-## Help and Support
-
-If you have any questions, please refer to [Help and Support](https://docs.newapi.pro/support):
-- [Community Interaction](https://docs.newapi.pro/support/community-interaction)
-- [Issue Feedback](https://docs.newapi.pro/support/feedback-issues)
-- [FAQ](https://docs.newapi.pro/support/faq)
-
-## 🌟 Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)

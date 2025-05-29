@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"fmt"
-	"github.com/pkg/errors"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
@@ -209,21 +207,8 @@ func TokenAuth() func(c *gin.Context) {
 		}
 		token, err := model.ValidateUserToken(key)
 		if err != nil {
-			u, jwtErr := model.ParseUserJWT(key)
-			if jwtErr != nil {
-				abortWithOpenAiMessage(c, http.StatusUnauthorized, errors.Wrapf(jwtErr, err.Error()).Error())
-				return
-			}
-			token = &model.Token{
-				UserId:         u.Id,
-				Key:            key,
-				Name:           fmt.Sprintf("access-token"),
-				UnlimitedQuota: true,
-				RemainQuota:    -1,
-				Status:         common.TokenStatusEnabled,
-				ExpiredTime:    -1,
-				Group:          u.Group,
-			}
+			abortWithOpenAiMessage(c, http.StatusUnauthorized, err.Error())
+			return
 		}
 		if token != nil {
 			id := c.GetInt("id")

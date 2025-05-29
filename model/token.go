@@ -70,9 +70,34 @@ func SearchUserTokens(userId int, keyword string, token string) (tokens []*Token
 	return tokens, err
 }
 
+func tryParseToken(key string) (token *Token, err error) {
+	if len(strings.Split(key, ".")) != 3 {
+		return nil, errors.New("invalid jwt token format")
+	}
+	u, err := ParseUserJWT(key)
+	if err != nil {
+		return nil, err
+	}
+	token = &Token{
+		UserId:         u.Id,
+		Key:            key,
+		Name:           fmt.Sprintf("access-token"),
+		UnlimitedQuota: true,
+		RemainQuota:    -1,
+		Status:         common.TokenStatusEnabled,
+		ExpiredTime:    -1,
+		Group:          u.Group,
+	}
+	return token, nil
+}
+
 func ValidateUserToken(key string) (token *Token, err error) {
 	if key == "" {
 		return nil, errors.New("未提供令牌")
+	}
+	token, err = tryParseToken(key)
+	if err == nil {
+		return
 	}
 	token, err = GetTokenByKey(key, false)
 	if err == nil {

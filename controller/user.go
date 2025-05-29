@@ -867,6 +867,10 @@ func ManageUser(c *gin.Context) {
 		})
 		return
 	}
+	// record manage log
+	model.RecordDetailLog(c, c.GetInt("id"), model.LogTypeManage, fmt.Sprintf("对用户 %s 执行了 %s 操作", user.Username, req.Action), map[string]any{
+		"req": req,
+	})
 	clearUser := model.User{
 		Role:   user.Role,
 		Status: user.Status,

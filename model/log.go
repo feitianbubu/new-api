@@ -80,25 +80,30 @@ func GetLogByKey(key string) (logs []*Log, err error) {
 }
 
 func RecordSystemLog(c *gin.Context, userId int, logType int, content string) {
-	if !common.LogConsumeEnabled {
+	RecordDetailLog(c, userId, logType, content, nil)
+}
+
+func RecordDetailLog(c *gin.Context, userId int, logType int, content string, other map[string]interface{}) {
+	if logType == LogTypeConsume && !common.LogConsumeEnabled {
 		return
 	}
+	if other == nil {
+		other = make(map[string]interface{})
+	}
+	other["ip"] = c.ClientIP()
 	username, _ := GetUsernameById(userId, false)
+	otherStr := common.MapToJsonStr(other)
 	log := &Log{
 		UserId:    userId,
 		Username:  username,
 		CreatedAt: common.GetTimestamp(),
 		Type:      logType,
 		Content:   content,
-	}
-	if ip := c.ClientIP(); ip != "" {
-		log.Other = common.MapToJsonStr(map[string]any{
-			"ip": ip,
-		})
+		Other:     otherStr,
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {
-		common.SysError("failed to record login log: " + err.Error())
+		common.SysError("failed to record detail log: " + err.Error())
 	}
 }
 

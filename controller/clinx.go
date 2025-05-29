@@ -5,6 +5,7 @@ import (
 	"one-api/common"
 	"one-api/model"
 	"one-api/relay"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -57,39 +58,95 @@ func ModelListLegacy(c *gin.Context) {
 // @Router /providers/modelsList [get]ag
 func ModelList(c *gin.Context) {
 	tag := c.Query("tag")
-	//channelId, _ := strconv.Atoi(c.Param("provider"))
 	enableAbilities := model.GetAllEnableAbilities()
+
 	type ModelVo struct {
 		Provider  string  `json:"provider"`
 		Model     string  `json:"model_name"`
 		ModelType *string `json:"model_type"`
+		Priority  *int64  `json:"priority,omitempty"`
 	}
-	mapData := make(map[string]ModelVo) //map[string]ModelVo
-	var data []any
+
+	// Priority models (earlier = higher priority)
+	var customPriority []string
+
+	pricing := model.GetPricing()
+	pricingMap := make(map[string]float64, len(pricing))
+	for _, p := range pricing {
+		pricingMap[p.ModelName] = p.ModelRatio
+	}
+
+	seen := make(map[string]bool)
+	var data []ModelVo
 	for _, ability := range enableAbilities {
-		//if channelId != 0 && ability.ChannelId != channelId {
-		//	continue
-		//}
 		if tag != "" && ability.Tag != nil && *ability.Tag != tag {
 			continue
 		}
-		//modelType := ""
-		//if ability.Tag != nil {
-		//	modelType = *ability.Tag
-		//}
-		name := ability.Model
-		if _, ok := mapData[name]; ok {
+		if seen[ability.Model] {
 			continue
 		}
-		v := ModelVo{
+		seen[ability.Model] = true
+
+		data = append(data, ModelVo{
 			Provider:  strconv.Itoa(ability.ChannelId),
 			Model:     ability.Model,
 			ModelType: ability.Tag,
-		}
-		mapData[name] = v
-		data = append(data, v)
+			Priority:  ability.Priority,
+		})
 	}
-	SuccessPage(c, data)
+
+	// Create priority index map
+	priorityMap := make(map[string]int, len(customPriority))
+	for i, m := range customPriority {
+		priorityMap[m] = i
+	}
+
+	slices.SortFunc(data, func(a, b ModelVo) int {
+		aPriorityIdx, aHasCustom := priorityMap[a.Model]
+		bPriorityIdx, bHasCustom := priorityMap[b.Model]
+
+		if aHasCustom && bHasCustom {
+			return aPriorityIdx - bPriorityIdx
+		}
+		if aHasCustom {
+			return -1
+		}
+		if bHasCustom {
+			return 1
+		}
+
+		aPriority := int64(0)
+		bPriority := int64(0)
+		if a.Priority != nil {
+			aPriority = *a.Priority
+		}
+		if b.Priority != nil {
+			bPriority = *b.Priority
+		}
+		if aPriority != bPriority {
+			return int(bPriority - aPriority)
+		}
+
+		aRatio := pricingMap[a.Model]
+		bRatio := pricingMap[b.Model]
+		if aRatio != bRatio {
+			if aRatio > bRatio {
+				return -1
+			}
+			return 1
+		}
+
+		return strings.Compare(a.Model, b.Model)
+	})
+
+	result := make([]any, len(data))
+	for i, modelVo := range data {
+		priority := int64(len(data) - i)
+		modelVo.Priority = &priority
+		result[i] = modelVo
+	}
+
+	SuccessPage(c, result)
 }
 
 // Completions

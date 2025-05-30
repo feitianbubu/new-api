@@ -11,7 +11,7 @@ all: build-frontend start-backend
 
 build-frontend:
 	@echo "Building frontend..."
-	@cd $(FRONTEND_DIR) && npm install && DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) npm run build
+	@cd $(FRONTEND_DIR) && npm install && DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(VERSION) npm run build
 
 start-backend:
 	@echo "Starting backend dev server..."
@@ -19,9 +19,8 @@ start-backend:
 
 swag:
 	@echo "Generating Swagger documentation..."
-	@cd $(BACKEND_DIR) && swag init --generatedTime --parseDependency --ot=json -o=web/dist/swag
-	@sed -i 's/"version": ".*"/"version": "$(VERSION)"/' web/dist/swag/swagger.json
 	@echo $(VERSION) > VERSION
+	@bash init_swagger.sh $(VERSION)
 	@echo "Swagger documentation generated."
 
 docker-build:
@@ -39,5 +38,5 @@ docker-build-push: swag docker-build docker-push
 
 mcp:
 	@echo "start mcp server..."
-	npx @agentdeskai/browser-tools-server@latest
+	npx @agentdeskai/browser-tools-server@1.2.0
 	@echo "mcp server started."

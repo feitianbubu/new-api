@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"one-api/common"
 	"one-api/model"
 	"one-api/relay"
 	"slices"
@@ -11,43 +10,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-// ModelListLegacy
-// Deprecated
-// compatible with legacy API to be removed in future
-// @Tags Clinx
-// @Summary 模型列表_旧接口_下版本移除
-// @Produce application/json
-// @Router /providers/modelsList/{provider} [get]
-func ModelListLegacy(c *gin.Context) {
-	channelId, _ := strconv.Atoi(c.Param("provider"))
-	enableAbilities := model.GetAllEnableAbilities()
-	type ModelVo struct {
-		Provider  string `json:"provider"`
-		Model     string `json:"model_name"`
-		ModelType string `json:"model_type"`
-	}
-	mapData := make(map[string]ModelVo) //map[string]ModelVo
-	for _, ability := range enableAbilities {
-		if channelId == 0 || ability.ChannelId == channelId {
-			modelType := ""
-			if ability.Tag != nil {
-				modelType = *ability.Tag
-			}
-			name := ability.Model
-			mapData[name] = ModelVo{
-				Provider:  strconv.Itoa(channelId),
-				Model:     ability.Model,
-				ModelType: modelType,
-			}
-		}
-	}
-	var data []any
-	for _, v := range mapData {
-		data = append(data, v)
-	}
-	SuccessPage(c, data)
-}
 
 // ModelList
 // @Tags Clinx
@@ -217,39 +179,6 @@ func SubmitImagine(c *gin.Context) {
 func RelayMidjourneyImage(c *gin.Context) {
 	trimClinxPath(c)
 	relay.RelayMidjourneyImage(c)
-}
-
-// ProvidersList
-// Deprecated
-// compatible with legacy API to be removed in future
-// @Tags Clinx
-// @Summary 渠道列表
-// @Produce application/json
-// @Router /providers/providersList [get]
-func ProvidersList(c *gin.Context) {
-	common.SysLog("Deprecated ProvidersList called")
-	channels, err := model.GetAllChannels(0, 999, false, false)
-	if err != nil {
-		Fail(c, "get channels failed")
-		return
-	}
-	type ProviderVo struct {
-		Id       string `json:"id"`
-		Name     string `json:"name"`
-		Provider string `json:"provider"`
-	}
-	var data []any
-	for _, channel := range channels {
-		if channel.Status != common.ChannelStatusEnabled {
-			continue
-		}
-		data = append(data, ProviderVo{
-			Id:       strconv.Itoa(channel.Id),
-			Name:     channel.Name,
-			Provider: strconv.Itoa(channel.Id),
-		})
-	}
-	SuccessPage(c, data)
 }
 
 // Nd99u

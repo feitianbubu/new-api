@@ -46,9 +46,6 @@ var indexPage []byte
 // @description                3. 根据模型调用大模型接口
 // @description
 // @description                > 注意：遇到问题可直接在此页面调用接口,确认是接口问题还是调用问题
-// @securityDefinitions.apikey  ApiKeyAuth
-// @in                          header
-// @name                        x-token
 // @BasePath                    /
 func main() {
 	err := godotenv.Load(".env")

@@ -44,7 +44,7 @@ import { StatusContext } from '../context/Status/index.js';
 const headerStyle = {
   boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
   borderBottom: '1px solid var(--semi-color-border)',
-  background: 'var(--semi-color-bg-0)',
+  background: 'var(--header-bar-bg)',
   transition: 'all 0.3s ease',
   width: '100%',
 };
@@ -67,8 +67,9 @@ const logoStyle = {
   display: 'flex',
   alignItems: 'center',
   gap: '10px',
-  padding: '0 10px',
+  padding: '0',
   height: '100%',
+  background: 'transparent',
 };
 
 // 自定义顶部栏系统名称样式
@@ -349,8 +350,13 @@ const HeaderBar = () => {
                   }
                 : {
                     logo: (
-                      <div style={logoStyle}>
-                        <img src={logo} alt='logo' style={{ height: '28px' }} />
+                      <div style={logoStyle} className="header-logo-button">
+                        <img src={logo} alt='logo' style={{ 
+                          height: '28px',
+                          width: '28px',
+                          objectFit: 'cover',
+                          background: 'transparent'
+                        }} />
                       </div>
                     ),
                     text: (

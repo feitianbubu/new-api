@@ -112,8 +112,8 @@ func ModelList(c *gin.Context) {
 }
 
 // Completions
-// @Summary      模型对话
-// @Description  接收符合 OpenAI API 格式的文本或聊天补全请求
+// @Summary      模型调用
+// @description.markdown chat-completions
 // @Tags         Clinx
 // @Accept       json
 // @Produce      json

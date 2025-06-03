@@ -29,7 +29,7 @@ const OAuth2Callback = (props) => {
         setUserData(data);
         updateAPI();
         showSuccess('登录成功！');
-        navigate('/token');
+        navigate('/detail');
       }
     } else {
       showError(message);

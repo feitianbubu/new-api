@@ -9,6 +9,7 @@ import {
   getLogo,
   getSystemName,
   isAdmin,
+  isRoot,
   isMobile,
   showError,
 } from '../helpers';
@@ -162,6 +163,7 @@ const SiderBar = () => {
         itemKey: 'token',
         to: '/token',
         icon: <IconKey />,
+        className: isRoot() ? '' : 'tableHiddle',
       },
       {
         text: t('使用日志'),

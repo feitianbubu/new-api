@@ -132,7 +132,7 @@ const LoginForm = () => {
             centered: true,
           });
         }
-        navigate('/token');
+        navigate('/detail');
       } else {
         showError(message);
       }

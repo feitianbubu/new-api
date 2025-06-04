@@ -628,3 +628,10 @@ body[theme-mode=dark] .header-logo-button:hover img {
   filter: drop-shadow(0 2px 4px rgba(var(--semi-blue-5), 0.3)) 
           drop-shadow(0 1px 3px rgba(255, 255, 255, 0.1));
 }
+
+.markdown-body {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+}

@@ -153,18 +153,17 @@ const HeaderBar = () => {
           {
             text: t('文档'),
             itemKey: 'docs',
-            isExternal: true,
-            externalLink: docsLink,
+            to: '/docs',
             icon: <IconHelpCircle style={headerIconStyle} />,
           },
         ]
       : []),
-    {
-      text: t('关于'),
-      itemKey: 'about',
-      to: '/about',
-      icon: <IconInfoCircle style={headerIconStyle} />,
-    },
+    // {
+    //   text: t('关于'),
+    //   itemKey: 'about',
+    //   to: '/about',
+    //   icon: <IconInfoCircle style={headerIconStyle} />,
+    // },
   ];
 
   async function logout() {
@@ -245,6 +244,7 @@ const HeaderBar = () => {
                 detail: '/detail',
                 home: '/',
                 chat: '/chat',
+                docs: '/docs',
               };
               return (
                 <div

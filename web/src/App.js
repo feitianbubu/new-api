@@ -27,6 +27,7 @@ import OAuth2Callback from './components/OAuth2Callback.js';
 import PersonalSetting from './components/PersonalSetting.js';
 import Setup from './pages/Setup/index.js';
 import SetupCheck from './components/SetupCheck';
+import Docs from './pages/Docs';
 
 const Home = lazy(() => import('./pages/Home'));
 const Detail = lazy(() => import('./pages/Detail'));
@@ -283,6 +284,14 @@ function App() {
                 <Chat2Link />
               </Suspense>
             </PrivateRoute>
+          }
+        />
+        <Route
+          path='/docs'
+          element={
+            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+              <Docs />
+            </Suspense>
           }
         />
         <Route path='*' element={<NotFound />} />

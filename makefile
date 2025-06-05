@@ -19,8 +19,9 @@ start-backend:
 
 swag:
 	@echo "Generating Swagger documentation..."
+	@cd $(BACKEND_DIR) && swag init --generatedTime --parseDependency --ot=json -o=web/dist/swag --md=docs/api-descriptions
+	@sed -i 's/"version": ".*"/"version": "$(VERSION)"/' web/dist/swag/swagger.json
 	@echo $(VERSION) > VERSION
-	@bash init_swagger.sh $(VERSION)
 	@echo "Swagger documentation generated."
 
 docker-build:

@@ -121,6 +121,11 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 	}()
 	dsn := os.Getenv(envName)
 	if dsn != "" {
+		var err error
+		dsn, err = common.DecryptDSNPassword(dsn)
+		if err != nil {
+			common.FatalLog("Failed to decrypt DSN password: " + err.Error())
+		}
 		if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
 			// Use PostgreSQL
 			common.SysLog("using PostgreSQL as database")
@@ -177,7 +182,10 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, error) {
 func InitDB() (err error) {
 	db, err := chooseDB("SQL_DSN", false)
 	if err == nil {
-		if common.DebugEnabled {
+		if common.SqlLogEnabled {
+			db = db.Debug()
+		}
+		if common.IsAutoMigrate {
 			db = db.Debug()
 		}
 		DB = db
@@ -187,6 +195,9 @@ func InitDB() (err error) {
 				panic(err)
 			}
 		}
+		if err = RegisterGormCryptoStrategyAES(DB); err != nil {
+			return err
+		}
 		sqlDB, err := DB.DB()
 		if err != nil {
 			return err
@@ -195,7 +206,7 @@ func InitDB() (err error) {
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
-		if !common.IsMasterNode {
+		if !common.IsAutoMigrate {
 			return nil
 		}
 		if common.UsingMySQL {
@@ -217,7 +228,7 @@ func InitLogDB() (err error) {
 	}
 	db, err := chooseDB("LOG_SQL_DSN", true)
 	if err == nil {
-		if common.DebugEnabled {
+		if common.SqlLogEnabled {
 			db = db.Debug()
 		}
 		LOG_DB = db
@@ -235,7 +246,7 @@ func InitLogDB() (err error) {
 		sqlDB.SetMaxOpenConns(common.GetEnvOrDefault("SQL_MAX_OPEN_CONNS", 1000))
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
-		if !common.IsMasterNode {
+		if !common.IsAutoMigrate {
 			return nil
 		}
 		common.SysLog("database migration started")

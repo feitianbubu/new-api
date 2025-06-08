@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"net/url"
 	"strconv"
 	"time"
@@ -90,9 +91,18 @@ func WeChatAuth(c *gin.Context) {
 			return
 		}
 	} else {
+
+		if os.Getenv("WECHAT_REG_ENABLED") != "true" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "管理员未开启微信注册",
+			})
+			return
+		}
+
 		if common.RegisterEnabled {
 			user.Username = "wechat_" + strconv.Itoa(model.GetMaxUserId()+1)
-			user.DisplayName = "WeChat User"
+			user.DisplayName = user.Username
 			user.Role = common.RoleCommonUser
 			user.Status = common.UserStatusEnabled
 
@@ -179,4 +189,108 @@ func WeChatBind(c *gin.Context) {
 		"message": "",
 	})
 	return
+}
+
+// 代理创建登录二维码请求
+func CreateLoginQRCode(c *gin.Context) {
+	if !common.WeChatAuthEnabled || !common.WeChatDirectLoginEnabled {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "管理员未开启微信扫码直接登录功能",
+		})
+		return
+	}
+
+	// 代理请求到wechat-server
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/wechat/create_login_qrcode", common.WeChatServerAddress), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "创建请求失败",
+		})
+		return
+	}
+	req.Header.Set("Authorization", common.WeChatServerToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
+	httpResponse, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "请求微信服务器失败",
+		})
+		return
+	}
+	defer httpResponse.Body.Close()
+
+	var response map[string]interface{}
+	err = json.NewDecoder(httpResponse.Body).Decode(&response)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "解析响应失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// 代理查询登录状态请求
+func GetLoginStatus(c *gin.Context) {
+	if !common.WeChatAuthEnabled || !common.WeChatDirectLoginEnabled {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "管理员未开启微信扫码直接登录功能",
+		})
+		return
+	}
+
+	loginToken := c.Query("login_token")
+	if loginToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "缺少login_token参数",
+		})
+		return
+	}
+
+	// 代理请求到wechat-server
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/wechat/login_status?login_token=%s", common.WeChatServerAddress, loginToken), nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "创建请求失败",
+		})
+		return
+	}
+	req.Header.Set("Authorization", common.WeChatServerToken)
+
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	httpResponse, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "请求微信服务器失败",
+		})
+		return
+	}
+	defer httpResponse.Body.Close()
+
+	var response map[string]interface{}
+	err = json.NewDecoder(httpResponse.Body).Decode(&response)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"message": "解析响应失败",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }

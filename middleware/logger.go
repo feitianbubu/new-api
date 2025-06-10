@@ -15,7 +15,37 @@ const (
 	maxSize = 1024
 )
 
+func RequestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !common.ResponseLogEnabled || c.Request.Body == nil {
+			c.Next()
+			return
+		}
+		bodyBytes, err := common.GetRequestBody(c)
+		if err != nil {
+			common.SysError("error reading request body: " + err.Error())
+			c.Next()
+			return
+		}
+
+		if len(bodyBytes) > 0 {
+			bodyToLog := string(bodyBytes)
+			if len(bodyToLog) > maxSize {
+				bodyToLog = bodyToLog[:maxSize] + "..."
+			}
+			msg := fmt.Sprintf("%s %s %s\n%s",
+				c.ClientIP(),
+				c.Request.Method,
+				c.Request.URL.Path,
+				bodyToLog)
+			common.LogInfo(c.Request.Context(), msg)
+		}
+		c.Next()
+	}
+}
+
 func SetUpLogger(server *gin.Engine) {
+	server.Use(RequestLogger())
 	server.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		var requestID string
 		if param.Keys != nil {
@@ -32,7 +62,6 @@ func SetUpLogger(server *gin.Engine) {
 			param.Path,
 		)
 
-		logStr += requestLog(param)
 		logStr += responseLog(param)
 
 		return logStr
@@ -43,25 +72,6 @@ func SetUpLogger(server *gin.Engine) {
 		c = common.WrapWriter(c)
 		c.Next()
 	})
-}
-
-func requestLog(param gin.LogFormatterParams) string {
-	if !common.DebugEnabled || param.Request.Body == nil {
-		return ""
-	}
-
-	requestBody, ok := param.Keys[common.KeyRequestBody]
-	if !ok {
-		return ""
-	}
-	bodyBytes, ok := requestBody.([]byte)
-	if !ok {
-		return ""
-	}
-	if len(bodyBytes) > maxSize {
-		bodyBytes = append(bodyBytes[:maxSize], []byte("...")...)
-	}
-	return fmt.Sprintf("Req: %s\n", string(bodyBytes))
 }
 
 func responseLog(param gin.LogFormatterParams) string {
@@ -85,5 +95,5 @@ func responseLog(param gin.LogFormatterParams) string {
 	if len(body) > maxSize {
 		body = string(body[:maxSize]) + "..."
 	}
-	return fmt.Sprintf("Res: %s\n", body)
+	return fmt.Sprintf("%s\n", body)
 }

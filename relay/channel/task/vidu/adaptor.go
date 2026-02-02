@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/gin-gonic/gin"
-
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
@@ -18,6 +15,7 @@ import (
 	taskcommon "github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/gin-gonic/gin"
 
 	"github.com/pkg/errors"
 )
@@ -27,31 +25,64 @@ import (
 // ============================
 
 type requestPayload struct {
-	Model             string   `json:"model"`
-	Images            []string `json:"images"`
-	Prompt            string   `json:"prompt,omitempty"`
-	Duration          int      `json:"duration,omitempty"`
-	Seed              int      `json:"seed,omitempty"`
-	Resolution        string   `json:"resolution,omitempty"`
-	MovementAmplitude string   `json:"movement_amplitude,omitempty"`
-	Bgm               bool     `json:"bgm,omitempty"`
-	Payload           string   `json:"payload,omitempty"`
-	CallbackUrl       string   `json:"callback_url,omitempty"`
+	Model             string         `json:"model"`
+	Images            []string       `json:"images,omitempty"`
+	StartImage        string         `json:"start_image,omitempty"`
+	ImageSettings     []imageSetting `json:"image_settings,omitempty"`
+	Subjects          []subject      `json:"subjects,omitempty"`
+	Prompt            string         `json:"prompt,omitempty"`
+	Duration          int            `json:"duration,omitempty"`
+	Seed              int            `json:"seed,omitempty"`
+	AspectRatio       string         `json:"aspect_ratio,omitempty"`
+	Resolution        string         `json:"resolution,omitempty"`
+	MovementAmplitude string         `json:"movement_amplitude,omitempty"`
+	Bgm               bool           `json:"bgm,omitempty"`
+	Audio             bool           `json:"audio,omitempty"`
+	OffPeak           bool           `json:"off_peak,omitempty"`
+	Watermark         bool           `json:"watermark,omitempty"`
+	WmURL             string         `json:"wm_url,omitempty"`
+	WmPosition        any            `json:"wm_position,omitempty"`
+	MetaData          string         `json:"meta_data,omitempty"`
+	Payload           string         `json:"payload,omitempty"`
+	CallbackUrl       string         `json:"callback_url,omitempty"`
 }
 
 type responsePayload struct {
-	TaskId            string   `json:"task_id"`
-	State             string   `json:"state"`
-	Model             string   `json:"model"`
-	Images            []string `json:"images"`
-	Prompt            string   `json:"prompt"`
-	Duration          int      `json:"duration"`
-	Seed              int      `json:"seed"`
-	Resolution        string   `json:"resolution"`
-	Bgm               bool     `json:"bgm"`
-	MovementAmplitude string   `json:"movement_amplitude"`
-	Payload           string   `json:"payload"`
-	CreatedAt         string   `json:"created_at"`
+	TaskId            string         `json:"task_id"`
+	State             string         `json:"state"`
+	Model             string         `json:"model"`
+	Images            []string       `json:"images,omitempty"`
+	StartImage        string         `json:"start_image,omitempty"`
+	ImageSettings     []imageSetting `json:"image_settings,omitempty"`
+	Subjects          []subject      `json:"subjects,omitempty"`
+	Prompt            string         `json:"prompt,omitempty"`
+	Duration          int            `json:"duration,omitempty"`
+	Seed              int            `json:"seed,omitempty"`
+	AspectRatio       string         `json:"aspect_ratio,omitempty"`
+	Resolution        string         `json:"resolution,omitempty"`
+	Bgm               bool           `json:"bgm,omitempty"`
+	Audio             bool           `json:"audio,omitempty"`
+	MovementAmplitude string         `json:"movement_amplitude,omitempty"`
+	OffPeak           bool           `json:"off_peak,omitempty"`
+	Watermark         bool           `json:"watermark,omitempty"`
+	WmURL             string         `json:"wm_url,omitempty"`
+	WmPosition        any            `json:"wm_position,omitempty"`
+	MetaData          string         `json:"meta_data,omitempty"`
+	Payload           string         `json:"payload,omitempty"`
+	Credits           int            `json:"credits,omitempty"`
+	CreatedAt         string         `json:"created_at,omitempty"`
+}
+
+type imageSetting struct {
+	Prompt   string `json:"prompt,omitempty"`
+	KeyImage string `json:"key_image,omitempty"`
+	Duration int    `json:"duration,omitempty"`
+}
+
+type subject struct {
+	ID      string   `json:"id,omitempty"`
+	Images  []string `json:"images,omitempty"`
+	VoiceID string   `json:"voice_id,omitempty"`
 }
 
 type taskResultResponse struct {
@@ -84,49 +115,49 @@ func (a *TaskAdaptor) Init(info *relaycommon.RelayInfo) {
 }
 
 func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskError {
-	if err := relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate); err != nil {
-		return err
-	}
-	req, err := relaycommon.GetTaskRequest(c)
-	if err != nil {
-		return service.TaskErrorWrapper(err, "get_task_request_failed", http.StatusBadRequest)
-	}
-	action := constant.TaskActionTextGenerate
-	if meatAction, ok := req.Metadata["action"]; ok {
-		action, _ = meatAction.(string)
-	} else if req.HasImage() {
-		action = constant.TaskActionGenerate
-		if info.ChannelType == constant.ChannelTypeVidu {
-			// vidu 增加 首尾帧生视频和参考图生视频
-			if len(req.Images) == 2 {
-				action = constant.TaskActionFirstTailGenerate
-			} else if len(req.Images) > 2 {
-				action = constant.TaskActionReferenceGenerate
-			}
-		}
-	}
-	info.Action = action
-	return nil
+	return relaycommon.ValidateBasicTaskRequest(c, info, constant.TaskActionGenerate)
 }
 
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
-	v, exists := c.Get("task_request")
-	if !exists {
-		return nil, fmt.Errorf("request not found in context")
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
 	}
-	req := v.(relaycommon.TaskSubmitReq)
 
 	body, err := a.convertToRequestPayload(&req, info)
 	if err != nil {
 		return nil, err
 	}
 
-	if info.Action == constant.TaskActionReferenceGenerate {
-		if strings.Contains(body.Model, "viduq2") {
-			// 参考图生视频只能用 viduq2 模型, 不能带有pro或turbo后缀 https://platform.vidu.cn/docs/reference-to-video
-			body.Model = "viduq2"
-		}
+	//switch info.Action {
+	//case constant.TaskActionReferenceGenerate, constant.TaskActionTextGenerate:
+	//	// 参考图生视频和文生视频只能用 viduq2 模型, 不能带有pro或turbo后缀 https://platform.vidu.cn/docs/reference-to-video
+	//	if strings.Contains(body.Model, "viduq2") {
+	//		body.Model = "viduq2"
+	//	}
+	//case constant.TaskActionGenerate, constant.TaskActionFirstTailGenerate:
+	//	// 图生视频和首尾帧生视频只能用 viduq2-turbo 或 viduq2-pro
+	//	if body.Model == "viduq2" {
+	//		body.Model = "viduq2-turbo"
+	//	}
+	//}
+
+	action := constant.TaskActionTextGenerate
+	if len(body.Images) == 1 {
+		action = constant.TaskActionGenerate
+	} else if len(body.Images) > 1 {
+		action = constant.TaskActionFirstTailGenerate
 	}
+	if len(body.Subjects) > 0 {
+		action = constant.TaskActionReferenceGenerate
+	}
+	if body.StartImage != "" {
+		action = constant.TaskActionMultiFrame
+	}
+	if metaAction, ok := req.Metadata["action"]; ok {
+		action, _ = metaAction.(string)
+	}
+	info.Action = action
 
 	data, err := common.Marshal(body)
 	if err != nil {
@@ -139,21 +170,27 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 	var path string
 	switch info.Action {
 	case constant.TaskActionGenerate:
-		path = "/img2video"
+		path = "img2video"
 	case constant.TaskActionFirstTailGenerate:
-		path = "/start-end2video"
+		path = "start-end2video"
 	case constant.TaskActionReferenceGenerate:
-		path = "/reference2video"
+		path = "reference2video"
+	case constant.TaskActionMultiFrame:
+		path = "multiframe"
 	default:
-		path = "/text2video"
+		path = "text2video"
 	}
-	return fmt.Sprintf("%s/ent/v2%s", a.baseURL, path), nil
+	return fmt.Sprintf("%s/ent/v2/%s", a.baseURL, path), nil
 }
 
 func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info *relaycommon.RelayInfo) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Token "+info.ApiKey)
+
+	if err := convertViraReq(c, req, info); err != nil {
+		return fmt.Errorf("convert vira request failed: %w", err)
+	}
 	return nil
 }
 
@@ -180,6 +217,10 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
+	if err = convertViraRes(c, responseBody, &vResp); err != nil {
+		return "", nil, service.TaskErrorWrapper(err, "convert_vira_response_failed", http.StatusInternalServerError)
+	}
+
 	ov := dto.NewOpenAIVideo()
 	ov.ID = info.PublicTaskID
 	ov.TaskID = info.PublicTaskID
@@ -204,6 +245,10 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Token "+key)
+
+	if err = convertViraTaskReq(req, taskID); err != nil {
+		return nil, fmt.Errorf("convert vira task request failed: %w", err)
+	}
 
 	client, err := service.GetHttpClientWithProxy(proxy)
 	if err != nil {
@@ -249,6 +294,8 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		return nil, errors.Wrap(err, "failed to unmarshal response body")
 	}
 
+	tryParseViraTaskResp(respBody, &taskResp)
+
 	state := taskResp.State
 	switch state {
 	case "created", "queueing":
@@ -259,6 +306,10 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		taskInfo.Status = model.TaskStatusSuccess
 		if len(taskResp.Creations) > 0 {
 			taskInfo.Url = taskResp.Creations[0].URL
+		}
+		if taskResp.Credits > 0 {
+			taskInfo.CompletionTokens = taskResp.Credits
+			taskInfo.TotalTokens = taskResp.Credits
 		}
 	case "failed":
 		taskInfo.Status = model.TaskStatusFailure
@@ -278,17 +329,7 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 		return nil, errors.Wrap(err, "unmarshal vidu task data failed")
 	}
 
-	openAIVideo := dto.NewOpenAIVideo()
-	openAIVideo.ID = originTask.TaskID
-	openAIVideo.Status = originTask.Status.ToVideoStatus()
-	openAIVideo.SetProgressStr(originTask.Progress)
-	openAIVideo.CreatedAt = originTask.CreatedAt
-	openAIVideo.CompletedAt = originTask.UpdatedAt
-
-	if len(viduResp.Creations) > 0 && viduResp.Creations[0].URL != "" {
-		openAIVideo.SetMetadata("url", viduResp.Creations[0].URL)
-	}
-
+	openAIVideo := originTask.ToOpenAIVideo()
 	if viduResp.State == "failed" && viduResp.ErrCode != "" {
 		openAIVideo.Error = &dto.OpenAIVideoError{
 			Message: viduResp.ErrCode,

@@ -55,11 +55,28 @@ type CameraControl struct {
 	Config *CameraConfig `json:"config,omitempty"`
 }
 
+// Omni-Video specific structures
+type ImageItem struct {
+	ImageUrl string `json:"image_url,omitempty"`
+	Type     string `json:"type,omitempty"` // first_frame or end_frame
+}
+
+type ElementItem struct {
+	ElementId int64 `json:"element_id,omitempty"`
+}
+
+type VideoItem struct {
+	VideoUrl          string `json:"video_url,omitempty"`
+	ReferType         string `json:"refer_type,omitempty"`          // feature or base
+	KeepOriginalSound string `json:"keep_original_sound,omitempty"` // yes or no
+}
+
 type requestPayload struct {
 	Prompt         string         `json:"prompt,omitempty"`
 	Image          string         `json:"image,omitempty"`
 	ImageTail      string         `json:"image_tail,omitempty"`
 	NegativePrompt string         `json:"negative_prompt,omitempty"`
+	Sound          string         `json:"sound,omitempty"` // on or off; only supported by v2.6+
 	Mode           string         `json:"mode,omitempty"`
 	Duration       string         `json:"duration,omitempty"`
 	AspectRatio    string         `json:"aspect_ratio,omitempty"`
@@ -69,8 +86,17 @@ type requestPayload struct {
 	StaticMask     string         `json:"static_mask,omitempty"`
 	DynamicMasks   []DynamicMask  `json:"dynamic_masks,omitempty"`
 	CameraControl  *CameraControl `json:"camera_control,omitempty"`
+	WatermarkInfo  *WatermarkInfo `json:"watermark_info,omitempty"`
 	CallbackUrl    string         `json:"callback_url,omitempty"`
 	ExternalTaskId string         `json:"external_task_id,omitempty"`
+	// Omni-Video specific fields
+	ImageList   []ImageItem   `json:"image_list,omitempty"`
+	ElementList []ElementItem `json:"element_list,omitempty"`
+	VideoList   []VideoItem   `json:"video_list,omitempty"`
+}
+
+type WatermarkInfo struct {
+	Enabled bool `json:"enabled"`
 }
 
 type responsePayload struct {
@@ -134,7 +160,12 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 
 // BuildRequestURL constructs the upstream URL.
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	path := lo.Ternary(info.Action == constant.TaskActionGenerate, "/v1/videos/image2video", "/v1/videos/text2video")
+	var path string
+	if strings.Contains(info.OriginModelName, "o1") {
+		path = "/v1/videos/omni-video"
+	} else {
+		path = lo.Ternary(info.Action == constant.TaskActionGenerate, "/v1/videos/image2video", "/v1/videos/text2video")
+	}
 
 	if isNewAPIRelay(info.ApiKey) {
 		return fmt.Sprintf("%s/kling%s", a.baseURL, path), nil
@@ -159,11 +190,10 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 
 // BuildRequestBody converts request into Kling specific format.
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
-	v, exists := c.Get("task_request")
-	if !exists {
-		return nil, fmt.Errorf("request not found in context")
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
 	}
-	req := v.(relaycommon.TaskSubmitReq)
 
 	body, err := a.convertToRequestPayload(&req, info)
 	if err != nil {
@@ -252,7 +282,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 }
 
 func (a *TaskAdaptor) GetModelList() []string {
-	return []string{"kling-v1", "kling-v1-6", "kling-v2-master"}
+	return []string{"kling-v1", "kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6"}
 }
 
 func (a *TaskAdaptor) GetChannelName() string {
@@ -279,9 +309,25 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 		CallbackUrl:    "",
 		ExternalTaskId: "",
 	}
-	if r.ModelName == "" {
-		r.ModelName = "kling-v1"
-		r.Model = "kling-v1"
+	if strings.Contains(req.Model, "o1") {
+		for _, img := range req.Images {
+			r.ImageList = append(r.ImageList, ImageItem{
+				ImageUrl: img,
+			})
+		}
+		if len(req.Images) > 0 {
+			r.ImageList[0].Type = "first_frame"
+		}
+		if len(req.Images) > 1 {
+			r.ImageList[1].Type = "end_frame"
+		}
+	} else {
+		if len(req.Images) > 0 {
+			r.Image = req.Images[0]
+		}
+		if len(req.Images) > 1 {
+			r.ImageTail = req.Images[1]
+		}
 	}
 	if err := taskcommon.UnmarshalMetadata(req.Metadata, &r); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata failed")
@@ -382,18 +428,10 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 		return nil, errors.Wrap(err, "unmarshal kling task data failed")
 	}
 
-	openAIVideo := dto.NewOpenAIVideo()
-	openAIVideo.ID = originTask.TaskID
-	openAIVideo.Status = originTask.Status.ToVideoStatus()
-	openAIVideo.SetProgressStr(originTask.Progress)
-	openAIVideo.CreatedAt = klingResp.Data.CreatedAt
-	openAIVideo.CompletedAt = klingResp.Data.UpdatedAt
+	openAIVideo := originTask.ToOpenAIVideo()
 
 	if len(klingResp.Data.TaskResult.Videos) > 0 {
 		video := klingResp.Data.TaskResult.Videos[0]
-		if video.Url != "" {
-			openAIVideo.SetMetadata("url", video.Url)
-		}
 		if video.Duration != "" {
 			openAIVideo.Seconds = video.Duration
 		}
@@ -413,4 +451,92 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 		}
 	}
 	return common.Marshal(openAIVideo)
+}
+
+type klingCostsResponse struct {
+	Code      int    `json:"code"`
+	Message   string `json:"message"`
+	RequestID string `json:"request_id"`
+	Data      *struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+		List []struct {
+			ResourcePackName string  `json:"resource_pack_name"`
+			Remaining        float64 `json:"remaining_quantity"`
+			Status           string  `json:"status"`
+		} `json:"resource_pack_subscribe_infos"`
+	} `json:"data"`
+}
+
+func (a *TaskAdaptor) UpdateBalance(channel *model.Channel) (float64, error) {
+	baseURL := channel.GetBaseURL()
+	if baseURL == "" {
+		baseURL = constant.ChannelBaseURLs[channel.Type]
+	}
+	// past one year window in ms
+	end := time.Now()
+	start := end.AddDate(-1, 0, 0)
+	url := fmt.Sprintf("%s/account/costs?start_time=%d&end_time=%d", baseURL, start.UnixMilli(), end.UnixMilli())
+
+	token, err := a.createJWTTokenWithKey(channel.Key)
+	if err != nil {
+		return 0, err
+	}
+	headers := http.Header{}
+	headers.Set("Content-Type", "application/json")
+	headers.Set("Authorization", "Bearer "+token)
+
+	body, err := getResponseBody("GET", url, channel, headers)
+	if err != nil {
+		return 0, err
+	}
+
+	resp := klingCostsResponse{}
+	if err = common.Unmarshal(body, &resp); err != nil {
+		return 0, err
+	}
+	if resp.Code != 0 {
+		return 0, fmt.Errorf("kling cost query failed: %s", resp.Message)
+	}
+	if resp.Data == nil || resp.Data.Code != 0 {
+		return 0, fmt.Errorf("kling cost query data error: %v", resp.Data)
+	}
+
+	var balance float64
+	for _, pack := range resp.Data.List {
+		if strings.EqualFold(pack.Status, "online") {
+			balance += pack.Remaining
+		}
+	}
+	channel.UpdateBalance(balance)
+	return balance, nil
+}
+
+func getResponseBody(method, url string, channel *model.Channel, headers http.Header) ([]byte, error) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	for k := range headers {
+		req.Header.Add(k, headers.Get(k))
+	}
+	client, err := service.NewProxyHttpClient(channel.GetSetting().Proxy)
+	if err != nil {
+		return nil, err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code: %d", res.StatusCode)
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err = res.Body.Close(); err != nil {
+		return nil, err
+	}
+	return body, nil
 }

@@ -116,14 +116,29 @@ func taskAdjustTokenQuota(ctx context.Context, task *model.Task, delta int) {
 func taskBillingOther(task *model.Task) map[string]interface{} {
 	other := make(map[string]interface{})
 	if bc := task.PrivateData.BillingContext; bc != nil {
-		other["model_price"] = bc.ModelPrice
-		other["group_ratio"] = bc.GroupRatio
+		if bc.ModelPrice > 0 {
+			other["model_price"] = bc.ModelPrice
+		}
+		if bc.GroupRatio > 0 {
+			other["group_ratio"] = bc.GroupRatio
+		}
+		if bc.ModelRatio > 0 {
+			other["model_ratio"] = bc.ModelRatio
+		}
 		if len(bc.OtherRatios) > 0 {
 			for k, v := range bc.OtherRatios {
 				other[k] = v
 			}
 		}
 	}
+	modelName := taskModelName(task)
+	if _, ok := other["model_ratio"]; !ok {
+		other["model_ratio"], _, _ = ratio_setting.GetModelRatio(modelName)
+	}
+	if _, ok := other["group_ratio"]; !ok {
+		other["group_ratio"] = ratio_setting.GetGroupRatio(task.Group)
+	}
+	other["completion_ratio"] = ratio_setting.GetCompletionRatio(modelName)
 	props := task.Properties
 	if props.UpstreamModelName != "" && props.UpstreamModelName != props.OriginModelName {
 		other["is_model_mapped"] = true

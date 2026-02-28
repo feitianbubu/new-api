@@ -52,15 +52,10 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 }
 
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
-	v, exists := c.Get("task_request")
-	if !exists {
-		return nil, fmt.Errorf("request not found in context")
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
 	}
-	req, ok := v.(relaycommon.TaskSubmitReq)
-	if !ok {
-		return nil, fmt.Errorf("invalid request type in context")
-	}
-
 	body, err := a.convertToRequestPayload(&req, info)
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request payload failed")
@@ -158,6 +153,22 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 		Prompt:     req.Prompt,
 		Duration:   &duration,
 		Resolution: resolution,
+	}
+	if len(req.Images) > 0 {
+		if strings.HasPrefix(req.Model, "S2V") {
+			subjectReference := SubjectReference{
+				Type: "character",
+				Image: []string{
+					req.Images[0],
+				},
+			}
+			videoRequest.SubjectReference = []SubjectReference{subjectReference}
+		} else {
+			videoRequest.FirstFrameImage = req.Images[0]
+		}
+	}
+	if len(req.Images) > 1 {
+		videoRequest.LastFrameImage = req.Images[1]
 	}
 	if err := req.UnmarshalMetadata(&videoRequest); err != nil {
 		return nil, errors.Wrap(err, "unmarshal metadata to video request failed")

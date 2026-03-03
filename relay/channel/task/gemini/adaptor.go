@@ -266,6 +266,23 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 		video.CompletedAt = task.UpdatedAt
 	}
 
+	if task.Status == model.TaskStatusFailure && len(task.Data) > 0 {
+		var opResp operationResponse
+		if err := common.Unmarshal(task.Data, &opResp); err == nil {
+			if len(opResp.Response.GenerateVideoResponse.RaiMediaFilteredReasons) > 0 {
+				video.Error = &dto.OpenAIVideoError{
+					Code:    "content_policy_violation",
+					Message: strings.Join(opResp.Response.GenerateVideoResponse.RaiMediaFilteredReasons, "; "),
+				}
+			} else if opResp.Error.Message != "" {
+				video.Error = &dto.OpenAIVideoError{
+					Code:    "generation_failed",
+					Message: opResp.Error.Message,
+				}
+			}
+		}
+	}
+
 	return common.Marshal(video)
 }
 

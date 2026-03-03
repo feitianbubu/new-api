@@ -63,6 +63,7 @@ type operationResponse struct {
 					URI string `json:"uri"`
 				} `json:"video"`
 			} `json:"generatedVideos"`
+			RaiMediaFilteredReasons []string `json:"raiMediaFilteredReasons"`
 		} `json:"generateVideoResponse"`
 	} `json:"response"`
 	Error struct {

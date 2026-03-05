@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
@@ -356,7 +357,16 @@ func updateChannelMoonshotBalance(channel *model.Channel) (float64, error) {
 	return availableBalanceUsd, nil
 }
 
+type BalanceUpdater interface {
+	UpdateBalance(channel *model.Channel) (float64, error)
+}
+
 func updateChannelBalance(channel *model.Channel) (float64, error) {
+	if adaptor := relay.GetTaskAdaptor(constant.TaskPlatform(strconv.Itoa(channel.Type))); adaptor != nil {
+		if balanceUpdater, ok := adaptor.(BalanceUpdater); ok {
+			return balanceUpdater.UpdateBalance(channel)
+		}
+	}
 	baseURL := constant.ChannelBaseURLs[channel.Type]
 	if channel.GetBaseURL() == "" {
 		channel.BaseURL = &baseURL
@@ -378,6 +388,8 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 		return updateChannelAPI2GPTBalance(channel)
 	case constant.ChannelTypeAIGC2D:
 		return updateChannelAIGC2DBalance(channel)
+	case constant.ChannelTypeAli:
+		return updateChannelAliBalance(channel)
 	case constant.ChannelTypeSiliconFlow:
 		return updateChannelSiliconFlowBalance(channel)
 	case constant.ChannelTypeDeepSeek:
@@ -439,10 +451,15 @@ func UpdateChannelBalance(c *gin.Context) {
 		})
 		return
 	}
+	oldBalance := channel.Balance
 	balance, err := updateChannelBalance(channel)
 	if err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	if oldBalance != balance {
+		userId := c.GetInt("id")
+		model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("管理员手动更新渠道「%s」余额，变更前为 %f，变更后为 %f", channel.Name, oldBalance, balance))
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

@@ -341,6 +341,8 @@ func SyncUpstreamModels(c *gin.Context) {
 		}
 	}
 
+	litellmResult := MergeLiteLLMModels(ctx, modelByName, nil)
+
 	// 3) 执行同步：仅创建缺失模型；若上游缺失该模型则跳过
 	createdModels := 0
 	createdVendors := 0
@@ -460,9 +462,13 @@ func SyncUpstreamModels(c *gin.Context) {
 			"created_list":    createdList,
 			"updated_list":    updatedList,
 			"source": gin.H{
-				"locale":      req.Locale,
-				"models_url":  modelsURL,
-				"vendors_url": vendorsURL,
+				"locale":          req.Locale,
+				"models_url":      modelsURL,
+				"vendors_url":     vendorsURL,
+				"litellm_enabled": litellmResult.LiteLLMEnabled,
+				"litellm_models":  litellmResult.LiteLLMModelsCount,
+				"litellm_merged":  litellmResult.MergedCount,
+				"litellm_added":   litellmResult.AddedCount,
 			},
 		},
 	})
@@ -540,6 +546,8 @@ func SyncUpstreamPreview(c *gin.Context) {
 			upstreamNames = append(upstreamNames, m.ModelName)
 		}
 	}
+
+	litellmResult := MergeLiteLLMModels(ctx, modelByName, &upstreamNames)
 
 	// 2) 本地已有模型
 	var locals []model.Model
@@ -625,9 +633,13 @@ func SyncUpstreamPreview(c *gin.Context) {
 			"missing":   missing,
 			"conflicts": conflicts,
 			"source": gin.H{
-				"locale":      locale,
-				"models_url":  modelsURL,
-				"vendors_url": vendorsURL,
+				"locale":          locale,
+				"models_url":      modelsURL,
+				"vendors_url":     vendorsURL,
+				"litellm_enabled": litellmResult.LiteLLMEnabled,
+				"litellm_models":  litellmResult.LiteLLMModelsCount,
+				"litellm_merged":  litellmResult.MergedCount,
+				"litellm_added":   litellmResult.AddedCount,
 			},
 		},
 	})

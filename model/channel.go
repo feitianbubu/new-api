@@ -23,7 +23,7 @@ import (
 type Channel struct {
 	Id                 int     `json:"id"`
 	Type               int     `json:"type" gorm:"default:0"`
-	Key                string  `json:"key" gorm:"not null"`
+	Key                string  `json:"key" gorm:"not null" crypto:"aes"`
 	OpenAIOrganization *string `json:"openai_organization"`
 	TestModel          *string `json:"test_model"`
 	Status             int     `json:"status" gorm:"default:1"`
@@ -196,10 +196,18 @@ func (channel *Channel) GetKeys() []string {
 	return keys
 }
 
+func (channel *Channel) GetKey() string {
+	if channel.Type == constant.ChannelTypeAli {
+		parts := strings.Split(channel.Key, "|")
+		return strings.TrimSpace(parts[0])
+	}
+	return channel.Key
+}
+
 func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 	// If not in multi-key mode, return the original key string directly.
 	if !channel.ChannelInfo.IsMultiKey {
-		return channel.Key, 0, nil
+		return channel.GetKey(), 0, nil
 	}
 
 	// Obtain all keys (split by \n)

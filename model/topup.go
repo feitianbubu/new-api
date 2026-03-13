@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -21,7 +22,9 @@ type TopUp struct {
 	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
 	CreateTime      int64   `json:"create_time"`
 	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	OutTradeNo    string  `json:"out_trade_no" gorm:"index"`
+	Channel       string  `json:"channel" gorm:"index"`
+	Status        string  `json:"status" gorm:"index"`
 }
 
 const (
@@ -104,6 +107,17 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 		topUp.Status = targetStatus
 		return tx.Save(topUp).Error
 	})
+}
+
+func GetTopUpByStatusRecent(status string, recent time.Duration) []*TopUp {
+	var topUps []*TopUp
+	var err error
+	createTime := time.Now().Add(-recent).Unix()
+	err = DB.Where("status = ? and create_time > ?", status, createTime).Find(&topUps).Error
+	if err != nil {
+		return nil
+	}
+	return topUps
 }
 
 func Recharge(referenceId string, customerId string, callerIp string) (err error) {

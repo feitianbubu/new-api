@@ -173,7 +173,13 @@ func getPayMoney(amount int64, group string) float64 {
 
 	payMoney := dAmount.Mul(dPrice).Mul(dTopupGroupRatio).Mul(dDiscount)
 
-	return payMoney.InexactFloat64()
+	return payMoney.RoundCeil(2).InexactFloat64()
+}
+func getAmountDecimal(payMoney float64, group string) decimal.Decimal {
+	dAmount := decimal.NewFromFloat(payMoney)
+	dTopupGroupRatio := decimal.NewFromFloat(common.GetTopupGroupRatio(group))
+	dPrice := decimal.NewFromFloat(operation_setting.Price)
+	return dAmount.Div(dPrice).Div(dTopupGroupRatio)
 }
 
 func getMinTopup() int64 {
@@ -186,6 +192,16 @@ func getMinTopup() int64 {
 	return int64(minTopup)
 }
 
+// RequestEpay
+// @Summary 创建订单
+// @Description 支付前获取服务端订单参数
+// @Tags TopUp
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param request body controller.EpayRequest true "充值请求体"
+// @Success 200 {object} map[string]interface{} "返回支付参数或支付链接，失败时返回错误信息"
+// @Router /api/user/pay [post]
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)

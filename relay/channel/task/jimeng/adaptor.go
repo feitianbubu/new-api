@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,10 +39,15 @@ type requestPayload struct {
 	ReqKey           string   `json:"req_key"`
 	BinaryDataBase64 []string `json:"binary_data_base64,omitempty"`
 	ImageUrls        []string `json:"image_urls,omitempty"`
+	ImageURL         string   `json:"image_url,omitempty"`
+	MaskURL          []string `json:"mask_url,omitempty"`
+	AudioURL         string   `json:"audio_url,omitempty"`
 	Prompt           string   `json:"prompt,omitempty"`
-	Seed             int64    `json:"seed"`
-	AspectRatio      string   `json:"aspect_ratio"`
+	Seed             *int64   `json:"seed,omitempty"`
+	AspectRatio      *string  `json:"aspect_ratio,omitempty"`
 	Frames           int      `json:"frames,omitempty"`
+	OutputResolution *int     `json:"output_resolution,omitempty"`
+	PeFastMode       *bool    `json:"pe_fast_mode,omitempty"`
 }
 
 type responsePayload struct {
@@ -103,10 +110,14 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 
 // BuildRequestURL constructs the upstream URL.
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	if isNewAPIRelay(info.ApiKey) {
-		return fmt.Sprintf("%s/jimeng/?Action=CVSync2AsyncSubmitTask&Version=2022-08-31", a.baseURL), nil
+	requestURL := "/?Action=CVSync2AsyncSubmitTask&Version=2022-08-31"
+	if isOmniHumanModel(info.UpstreamModelName) {
+		requestURL = "/?Action=CVSubmitTask&Version=2022-08-31"
 	}
-	return fmt.Sprintf("%s/?Action=CVSync2AsyncSubmitTask&Version=2022-08-31", a.baseURL), nil
+	if isNewAPIRelay(info.ApiKey) {
+		requestURL = fmt.Sprintf("/jimeng%s", requestURL)
+	}
+	return fmt.Sprintf("%s%s", a.baseURL, requestURL), nil
 }
 
 // BuildRequestHeader sets required headers.
@@ -122,16 +133,15 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 }
 
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
-	v, exists := c.Get("task_request")
-	if !exists {
-		return nil, fmt.Errorf("request not found in context")
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil, err
 	}
-	req, ok := v.(relaycommon.TaskSubmitReq)
-	if !ok {
-		return nil, fmt.Errorf("invalid request type in context")
+	if err := tryConvertOmniHumanFilesToURLs(c, &req); err != nil {
+		return nil, errors.Wrap(err, "convert omnihuman files to urls failed")
 	}
 	// 支持openai sdk的图片上传方式
-	if mf, err := c.MultipartForm(); err == nil {
+	if mf, err := c.MultipartForm(); err == nil && len(req.Images) == 0 {
 		if files, exists := mf.File["input_reference"]; exists && len(files) > 0 {
 			if len(files) == 1 {
 				info.Action = constant.TaskActionGenerate
@@ -169,6 +179,30 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request payload failed")
 	}
+
+	// 按秒计费:https://www.volcengine.com/docs/85621/1792702
+	var seconds int
+	var matched bool
+	if seconds, matched, err = resolveOmniHumanBillingSeconds(c, req.Model, body); err != nil {
+		return nil, errors.Wrap(err, "resolve omnihuman billing seconds failed")
+	} else if !matched {
+		if frames := body.Frames; frames > 0 {
+			if !slices.Contains([]int{121, 241}, frames) {
+				return nil, fmt.Errorf("invalid frames value: %d, required 121 or 241", frames)
+			}
+			seconds = frames / 24
+		} else if seconds, _ = strconv.Atoi(req.Seconds); seconds > 0 {
+			if !slices.Contains([]int{5, 10}, seconds) {
+				return nil, fmt.Errorf("invalid seconds value: %d, required 5 or 10", seconds)
+			}
+			body.Frames = seconds*24 + 1
+		} else {
+			seconds = 5
+		}
+	}
+	info.PriceData.AddOtherRatio("seconds", float64(seconds))
+
+	info.UpstreamModelName = body.ReqKey
 	data, err := common.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -213,18 +247,26 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 
 // FetchTask fetch task status
 func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy string) (*http.Response, error) {
+	requestURL := "/?Action=CVSync2AsyncGetResult&Version=2022-08-31"
+	if reqKey, _ := body["req_key"].(string); isOmniHumanModel(reqKey) {
+		requestURL = "/?Action=CVGetResult&Version=2022-08-31"
+	}
 	taskID, ok := body["task_id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("invalid task_id")
 	}
 
-	uri := fmt.Sprintf("%s/?Action=CVSync2AsyncGetResult&Version=2022-08-31", baseUrl)
 	if isNewAPIRelay(key) {
-		uri = fmt.Sprintf("%s/jimeng/?Action=CVSync2AsyncGetResult&Version=2022-08-31", a.baseURL)
+		requestURL = fmt.Sprintf("/jimeng%s", requestURL)
 	}
+	uri := fmt.Sprintf("%s%s", baseUrl, requestURL)
 	payload := map[string]string{
-		"req_key": "jimeng_vgfm_t2v_l20", // This is fixed value from doc: https://www.volcengine.com/docs/85621/1544774
 		"task_id": taskID,
+	}
+	if reqKey, ok := body["req_key"].(string); !ok {
+		return nil, fmt.Errorf("invalid req_key")
+	} else {
+		payload["req_key"] = reqKey
 	}
 	payloadBytes, err := common.Marshal(payload)
 	if err != nil {
@@ -242,14 +284,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if isNewAPIRelay(key) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	} else {
-		keyParts := strings.Split(key, "|")
-		if len(keyParts) != 2 {
-			return nil, fmt.Errorf("invalid api key format for jimeng: expected 'ak|sk'")
-		}
-		accessKey := strings.TrimSpace(keyParts[0])
-		secretKey := strings.TrimSpace(keyParts[1])
-
-		if err := a.signRequest(req, accessKey, secretKey); err != nil {
+		if err := a.signRequest(req, a.accessKey, a.secretKey); err != nil {
 			return nil, errors.Wrap(err, "sign request failed")
 		}
 	}
@@ -406,22 +441,28 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 	// 即梦视频3.0 ReqKey转换
 	// https://www.volcengine.com/docs/85621/1792707
 	imageLen := lo.Max([]int{len(req.Images), len(r.BinaryDataBase64), len(r.ImageUrls)})
-	if strings.Contains(r.ReqKey, "jimeng_v30") {
-		if r.ReqKey == "jimeng_v30_pro" {
+	if strings.HasPrefix(r.ReqKey, "jimeng_v30") || strings.HasPrefix(r.ReqKey, "v30") {
+		if strings.Contains(r.ReqKey, "v30_pro") {
 			// 3.0 pro只有固定的jimeng_ti2v_v30_pro
-			r.ReqKey = "jimeng_ti2v_v30_pro"
+			r.ReqKey = strings.ReplaceAll(r.ReqKey, "v30_pro", "ti2v_v30_pro")
 		} else if imageLen > 1 {
 			// 多张图片：首尾帧生成
-			r.ReqKey = strings.TrimSuffix(strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_i2v_first_tail_v30", 1), "p")
+			r.ReqKey = strings.Replace(r.ReqKey, "v30", "i2v_first_tail_v30", 1)
+			r.ReqKey = strings.ReplaceAll(r.ReqKey, "1080p", "1080")
 		} else if imageLen == 1 {
 			// 单张图片：图生视频
-			r.ReqKey = strings.TrimSuffix(strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_i2v_first_v30", 1), "p")
+			r.ReqKey = strings.Replace(r.ReqKey, "v30", "i2v_first_v30", 1)
+			r.ReqKey = strings.ReplaceAll(r.ReqKey, "1080p", "1080")
 		} else {
 			// 无图片：文生视频
-			r.ReqKey = strings.Replace(r.ReqKey, "jimeng_v30", "jimeng_t2v_v30", 1)
+			r.ReqKey = strings.Replace(r.ReqKey, "v30", "t2v_v30", 1)
 		}
 	}
 
+	// 图片文件URL，仅支持输入1张图片 参考: https://www.volcengine.com/docs/85621/1777001
+	if strings.Contains(r.ReqKey, "ti2v_v30_pro") && len(req.Images) > 1 {
+		return nil, fmt.Errorf("jimeng_v30_pro 不支持多图输入")
+	}
 	return &r, nil
 }
 
@@ -440,11 +481,20 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		taskResult.Progress = "100%"
 	}
 	switch resTask.Data.Status {
+	case "processing":
+		taskResult.Status = model.TaskStatusQueued
+		taskResult.Progress = "5%"
 	case "in_queue":
 		taskResult.Status = model.TaskStatusQueued
 		taskResult.Progress = "10%"
+	case "generating":
+		taskResult.Status = model.TaskStatusInProgress
+		taskResult.Progress = "50%"
 	case "done":
 		taskResult.Status = model.TaskStatusSuccess
+		taskResult.Progress = "100%"
+	case "not_found", "expired":
+		taskResult.Status = model.TaskStatusFailure
 		taskResult.Progress = "100%"
 	}
 	taskResult.Url = resTask.Data.VideoUrl
@@ -457,13 +507,7 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, erro
 		return nil, errors.Wrap(err, "unmarshal jimeng task data failed")
 	}
 
-	openAIVideo := dto.NewOpenAIVideo()
-	openAIVideo.ID = originTask.TaskID
-	openAIVideo.Status = originTask.Status.ToVideoStatus()
-	openAIVideo.SetProgressStr(originTask.Progress)
-	openAIVideo.SetMetadata("url", jimengResp.Data.VideoUrl)
-	openAIVideo.CreatedAt = originTask.CreatedAt
-	openAIVideo.CompletedAt = originTask.UpdatedAt
+	openAIVideo := originTask.ToOpenAIVideo()
 
 	if jimengResp.Code != 10000 {
 		openAIVideo.Error = &dto.OpenAIVideoError{

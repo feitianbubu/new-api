@@ -271,7 +271,7 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			relayMode == relayconstant.RelayModeSunoFetchByID {
 			shouldSelectChannel = false
 		} else {
-			modelName := service.CoverTaskActionToModelName(constant.TaskPlatformSuno, c.Param("action"))
+			modelName := service.GetTaskModelName(c, constant.TaskPlatformSuno)
 			modelRequest.Model = modelName
 		}
 		c.Set("platform", string(constant.TaskPlatformSuno))
@@ -327,6 +327,34 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			modelRequest.Model = modelName
 		}
 		c.Set("relay_mode", relayMode)
+	} else if strings.HasPrefix(c.Request.URL.Path, "/v1beta/interactions") {
+		relayMode := relayconstant.RelayModeInteractions
+		c.Set("relay_mode", relayMode)
+		if c.Request.Method == http.MethodGet {
+			interactionID := extractInteractionIDFromPath(c.Request.URL.Path)
+			state, found, mapErr := model.GetInteractionState(interactionID)
+			if mapErr != nil {
+				return nil, false, fmt.Errorf("failed to load interaction state: %w", mapErr)
+			}
+			if !found || state.ChannelID <= 0 || strings.TrimSpace(state.Model) == "" {
+				return nil, false, errors.New("interaction state not found")
+			}
+			userID := c.GetInt("id")
+			if userID > 0 && state.UserID > 0 && state.UserID != userID {
+				return nil, false, errors.New("interaction state not found")
+			}
+			modelRequest.Model = state.Model
+			common.SetContextKey(c, constant.ContextKeyTokenSpecificChannelId, strconv.Itoa(state.ChannelID))
+		} else {
+			interactionsReq := &dto.InteractionsRequest{}
+			if err := common.UnmarshalBodyReusable(c, interactionsReq); err != nil {
+				return nil, false, errors.New(i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+			}
+			modelRequest.Model = common.GetStringIfEmpty(strings.TrimSpace(interactionsReq.Agent), strings.TrimSpace(interactionsReq.Model))
+			if modelRequest.Model == "" {
+				return nil, false, errors.New(i18n.T(c, i18n.MsgDistributorModelNameRequired))
+			}
+		}
 	} else if !strings.HasPrefix(c.Request.URL.Path, "/v1/audio/transcriptions") && !strings.Contains(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
 		req, err := getModelFromRequest(c)
 		if err != nil {
@@ -514,4 +542,16 @@ func extractModelNameFromGeminiPath(path string) string {
 
 	// 返回模型名部分
 	return path[startIndex : startIndex+colonIndex]
+}
+
+func extractInteractionIDFromPath(path string) string {
+	const prefix = "/v1beta/interactions/"
+	if !strings.HasPrefix(path, prefix) {
+		return ""
+	}
+	interactionID := strings.TrimPrefix(path, prefix)
+	if idx := strings.IndexByte(interactionID, '?'); idx != -1 {
+		interactionID = interactionID[:idx]
+	}
+	return strings.TrimSpace(interactionID)
 }

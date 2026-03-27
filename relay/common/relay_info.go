@@ -700,19 +700,17 @@ func (t *TaskSubmitReq) UnmarshalJSON(data []byte) error {
 	}
 
 	if len(aux.Metadata) > 0 {
+		metadataBytes := []byte(aux.Metadata)
 		var metadataStr string
-		if err := common.Unmarshal(aux.Metadata, &metadataStr); err == nil && metadataStr != "" {
-			var metadataObj map[string]interface{}
-			if err := common.Unmarshal([]byte(metadataStr), &metadataObj); err == nil {
-				t.Metadata = metadataObj
-				return nil
-			}
+		if err := common.Unmarshal(aux.Metadata, &metadataStr); err == nil {
+			metadataBytes = []byte(metadataStr)
 		}
 
 		var metadataObj map[string]interface{}
-		if err := common.Unmarshal(aux.Metadata, &metadataObj); err == nil {
-			t.Metadata = metadataObj
+		if err := common.Unmarshal(metadataBytes, &metadataObj); err != nil {
+			return fmt.Errorf("metadata must be a valid JSON object")
 		}
+		t.Metadata = metadataObj
 	}
 
 	return nil

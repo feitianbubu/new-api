@@ -143,3 +143,9 @@ When creating a pull request:
 - First compare the current git user (`git config user.name` / `git config user.email`) with the repository's historical core developers (for example, the recurring top authors in `git log`). Do not change git config.
 - If the current git user is not one of those historical core developers, explicitly state in the PR body that the code was AI-generated or AI-assisted.
 - Always use the repository PR template at `.github/PULL_REQUEST_TEMPLATE.md` when drafting the PR title/body. Preserve the template structure and fill in the relevant sections instead of replacing it with an ad hoc format.
+
+### Rule 9: Minimal Fixes and Full Chain Debugging
+- Add as a top-level rule under ## Code Style or ## General Rules section\n\nWhen proposing solutions, start with the simplest minimal fix. Do NOT over-engineer or add legacy support, default values, or extra logic unless explicitly asked. If the user says 'simplify', strip it down further.
+- Add at the very top of CLAUDE.md as the first lines\n\nThis is a Go project (with some JS/React frontend). Primary language is Go. Always respond in Chinese (简体中文) unless the user writes in English.
+- Add under ## Debugging section\n\nWhen debugging, consider the full chain of effects before proposing a fix. For HTTP issues, consider HTTP/2 vs HTTP/1.1 header behavior. For Docker networking, consider DNS resolution and TUN/VPN routing. Don't propose surface-level fixes that miss root causes.
+- Add under ## General Rules section\n\nWhen user redirects you to a different/simpler approach, immediately adopt it without defending the original approach. Do not re-suggest the abandoned approach.

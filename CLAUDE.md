@@ -135,3 +135,9 @@ For request structs that are parsed from client JSON and then re-marshaled to up
 ### Rule 7: Billing Expression System — Read `pkg/billingexpr/expr.md`
 
 When working on tiered/dynamic billing (expression-based pricing), you MUST read `pkg/billingexpr/expr.md` first. It documents the design philosophy, expression language (variables, functions, examples), full system architecture (editor → storage → pre-consume → settlement → log display), token normalization rules (`p`/`c` auto-exclusion), quota conversion, and expression versioning. All code changes to the billing expression system must follow the patterns described in that document.
+
+### Rule 8: Minimal Fixes and Full Chain Debugging
+- Add as a top-level rule under ## Code Style or ## General Rules section\n\nWhen proposing solutions, start with the simplest minimal fix. Do NOT over-engineer or add legacy support, default values, or extra logic unless explicitly asked. If the user says 'simplify', strip it down further.
+- Add at the very top of CLAUDE.md as the first lines\n\nThis is a Go project (with some JS/React frontend). Primary language is Go. Always respond in Chinese (简体中文) unless the user writes in English.
+- Add under ## Debugging section\n\nWhen debugging, consider the full chain of effects before proposing a fix. For HTTP issues, consider HTTP/2 vs HTTP/1.1 header behavior. For Docker networking, consider DNS resolution and TUN/VPN routing. Don't propose surface-level fixes that miss root causes.
+- Add under ## General Rules section\n\nWhen user redirects you to a different/simpler approach, immediately adopt it without defending the original approach. Do not re-suggest the abandoned approach.

@@ -1,10 +1,12 @@
 package gemini
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/QuantumNous/new-api/dto"
@@ -57,7 +59,168 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 	return nil, errors.New("not implemented")
 }
 
+type ImageConfig struct {
+	AspectRatio string `json:"aspectRatio,omitempty"`
+	ImageSize   string `json:"imageSize,omitempty"`
+}
+
+type SizeMapping struct {
+	AspectRatio string
+	ImageSize   string
+}
+
+type QualityMapping struct {
+	Standard string
+	HD       string
+	High     string
+	FourK    string
+	Auto     string
+}
+
+func getImageSizeMapping() QualityMapping {
+	return QualityMapping{
+		Standard: "1K",
+		HD:       "2K",
+		High:     "2K",
+		FourK:    "4K",
+		Auto:     "1K",
+	}
+}
+
+func getSizeMappings() map[string]SizeMapping {
+	return map[string]SizeMapping{
+		// Gemini 2.5 Flash Image - default 1K resolutions
+		"1024x1024": {AspectRatio: "1:1", ImageSize: ""},
+		"832x1248":  {AspectRatio: "2:3", ImageSize: ""},
+		"1248x832":  {AspectRatio: "3:2", ImageSize: ""},
+		"864x1184":  {AspectRatio: "3:4", ImageSize: ""},
+		"1184x864":  {AspectRatio: "4:3", ImageSize: ""},
+		"896x1152":  {AspectRatio: "4:5", ImageSize: ""},
+		"1152x896":  {AspectRatio: "5:4", ImageSize: ""},
+		"768x1344":  {AspectRatio: "9:16", ImageSize: ""},
+		"1344x768":  {AspectRatio: "16:9", ImageSize: ""},
+		"1536x672":  {AspectRatio: "21:9", ImageSize: ""},
+
+		// Gemini 3 Pro Image Preview resolutions
+		// 1K resolutions (note: 1024x1024 already exists in 2.5 Flash section)
+		"848x1264": {AspectRatio: "2:3", ImageSize: "1K"},
+		"1264x848": {AspectRatio: "3:2", ImageSize: "1K"},
+		"896x1200": {AspectRatio: "3:4", ImageSize: "1K"},
+		"1200x896": {AspectRatio: "4:3", ImageSize: "1K"},
+		"928x1152": {AspectRatio: "4:5", ImageSize: "1K"},
+		"1152x928": {AspectRatio: "5:4", ImageSize: "1K"},
+		"768x1376": {AspectRatio: "9:16", ImageSize: "1K"},
+		"1376x768": {AspectRatio: "16:9", ImageSize: "1K"},
+		"1584x672": {AspectRatio: "21:9", ImageSize: "1K"},
+		// 2K resolutions
+		"2048x2048": {AspectRatio: "1:1", ImageSize: "2K"},
+		"1696x2528": {AspectRatio: "2:3", ImageSize: "2K"},
+		"2528x1696": {AspectRatio: "3:2", ImageSize: "2K"},
+		"1792x2400": {AspectRatio: "3:4", ImageSize: "2K"},
+		"2400x1792": {AspectRatio: "4:3", ImageSize: "2K"},
+		"1856x2304": {AspectRatio: "4:5", ImageSize: "2K"},
+		"2304x1856": {AspectRatio: "5:4", ImageSize: "2K"},
+		"1536x2752": {AspectRatio: "9:16", ImageSize: "2K"},
+		"2752x1536": {AspectRatio: "16:9", ImageSize: "2K"},
+		"3168x1344": {AspectRatio: "21:9", ImageSize: "2K"},
+		// 4K resolutions
+		"4096x4096": {AspectRatio: "1:1", ImageSize: "4K"},
+		"3392x5056": {AspectRatio: "2:3", ImageSize: "4K"},
+		"5056x3392": {AspectRatio: "3:2", ImageSize: "4K"},
+		"3584x4800": {AspectRatio: "3:4", ImageSize: "4K"},
+		"4800x3584": {AspectRatio: "4:3", ImageSize: "4K"},
+		"3712x4608": {AspectRatio: "4:5", ImageSize: "4K"},
+		"4608x3712": {AspectRatio: "5:4", ImageSize: "4K"},
+		"3072x5504": {AspectRatio: "9:16", ImageSize: "4K"},
+		"5504x3072": {AspectRatio: "16:9", ImageSize: "4K"},
+		"6336x2688": {AspectRatio: "21:9", ImageSize: "4K"},
+	}
+}
+
+func processSizeParameters(size, quality string) ImageConfig {
+	config := ImageConfig{} // 默认为空值
+
+	if size != "" {
+		if strings.Contains(size, ":") {
+			config.AspectRatio = size // 直接设置，不与默认值比较
+		} else {
+			if mapping, exists := getSizeMappings()[size]; exists {
+				if mapping.AspectRatio != "" {
+					config.AspectRatio = mapping.AspectRatio
+				}
+				if mapping.ImageSize != "" {
+					config.ImageSize = mapping.ImageSize
+				}
+			}
+		}
+	}
+
+	if quality != "" {
+		qualityMapping := getImageSizeMapping()
+		switch strings.ToLower(strings.TrimSpace(quality)) {
+		case "hd", "high":
+			config.ImageSize = qualityMapping.HD
+		case "4k":
+			config.ImageSize = qualityMapping.FourK
+		case "standard", "medium", "low", "auto", "1k":
+			config.ImageSize = qualityMapping.Standard
+		}
+	}
+
+	return config
+}
+
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
+	if model_setting.IsGeminiModelSupportImagine(info.UpstreamModelName) {
+		var content any
+		content = []any{
+			dto.MediaContent{
+				Type: dto.ContentTypeText,
+				Text: request.Prompt,
+			},
+		}
+		if base64Data, err := relaycommon.GetImageBase64sFromForm(c); err == nil {
+			for _, data := range base64Data {
+				content = append(content.([]any), dto.MediaContent{
+					Type: dto.ContentTypeFile,
+					File: &dto.MessageFile{
+						FileData: data.String(),
+					},
+				})
+			}
+		} else {
+			content = request.Prompt
+		}
+
+		chatRequest := dto.GeneralOpenAIRequest{
+			Model: request.Model,
+			Messages: []dto.Message{
+				{Role: "user", Content: content},
+			},
+			N: lo.ToPtr(int(lo.FromPtrOr(request.N, uint(1)))),
+		}
+
+		config := processSizeParameters(strings.TrimSpace(request.Size), request.Quality)
+
+		// 兼容 nano-banana 传quality[imageSize]会报错 An internal error has occurred. Please retry or report in https://developers.generativeai.google/guide/troubleshooting
+		if slices.Contains([]string{"nano-banana", "gemini-2.5-flash-image"}, info.UpstreamModelName) {
+			config.ImageSize = ""
+		}
+
+		googleGenerationConfig := map[string]interface{}{
+			"responseModalities": []string{"TEXT", "IMAGE"},
+			"imageConfig":        config,
+		}
+
+		extraBody := map[string]interface{}{
+			"google": map[string]interface{}{
+				"generationConfig": googleGenerationConfig,
+			},
+		}
+		chatRequest.ExtraBody, _ = json.Marshal(extraBody)
+
+		return a.ConvertOpenAIRequest(c, info, &chatRequest)
+	}
 	if !strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return nil, errors.New("not supported model for image generation, only imagen models are supported")
 	}
@@ -69,17 +232,8 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 		if strings.Contains(size, ":") {
 			aspectRatio = size
 		} else {
-			switch size {
-			case "256x256", "512x512", "1024x1024":
-				aspectRatio = "1:1"
-			case "1536x1024":
-				aspectRatio = "3:2"
-			case "1024x1536":
-				aspectRatio = "2:3"
-			case "1024x1792":
-				aspectRatio = "9:16"
-			case "1792x1024":
-				aspectRatio = "16:9"
+			if mapping, exists := getSizeMappings()[size]; exists && mapping.AspectRatio != "" {
+				aspectRatio = mapping.AspectRatio
 			}
 		}
 	}
@@ -145,6 +299,10 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	}
 
 	version := model_setting.GetGeminiVersionSetting(info.UpstreamModelName)
+
+	if info.RelayMode == constant.RelayModeInteractions {
+		return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, info.RequestURLPath, info.ChannelType), nil
+	}
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return fmt.Sprintf("%s/%s/models/%s:predict", info.ChannelBaseUrl, version, info.UpstreamModelName), nil
@@ -261,6 +419,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 
 	if strings.HasPrefix(info.UpstreamModelName, "imagen") {
 		return GeminiImageHandler(c, info, resp)
+	}
+
+	if model_setting.IsGeminiModelSupportImagine(info.UpstreamModelName) {
+		if info.IsStream {
+			return ChatImageStreamHandler(c, info, resp)
+		}
+		return ChatImageHandler(c, info, resp)
 	}
 
 	// check if the model is an embedding model

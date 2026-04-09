@@ -27,6 +27,8 @@ import (
 	"github.com/samber/lo"
 )
 
+var ErrNoImagesGenerated = errors.New("no images generated")
+
 // https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference?hl=zh-cn#blob
 var geminiSupportedMimeTypes = map[string]bool{
 	"application/pdf": true,
@@ -314,6 +316,16 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 							}
 						}
 					}
+				}
+			}
+
+			if generationConfig, ok := googleBody["generationConfig"].(map[string]any); ok {
+				generationConfigBytes, err := json.Marshal(generationConfig)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal generationConfig: %w", err)
+				}
+				if err := json.Unmarshal(generationConfigBytes, &geminiRequest.GenerationConfig); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal generationConfig: %w", err)
 				}
 			}
 
@@ -1671,6 +1683,142 @@ func GeminiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		CompletionTokens: 0,                             // image generation does not calculate completion tokens
 		TotalTokens:      imageTokens * generatedImages,
 	}
+
+	return usage, nil
+}
+
+// extractNonThoughtImages extracts image data from Gemini candidates, skipping thought parts.
+func extractNonThoughtImages(candidates []dto.GeminiChatCandidate) []dto.ImageData {
+	var result []dto.ImageData
+	for _, candidate := range candidates {
+		for _, part := range candidate.Content.Parts {
+			if part.Thought {
+				continue
+			}
+			if part.InlineData != nil && strings.HasPrefix(part.InlineData.MimeType, "image") {
+				result = append(result, dto.ImageData{
+					B64Json: part.InlineData.Data,
+				})
+			}
+		}
+	}
+	return result
+}
+
+func convertToOaiImageResponse(geminiResponse *dto.GeminiChatResponse) (*dto.ImageResponse, error) {
+	data := extractNonThoughtImages(geminiResponse.Candidates)
+	if len(data) == 0 {
+		var texts strings.Builder
+		for _, candidate := range geminiResponse.Candidates {
+			for _, part := range candidate.Content.Parts {
+				if part.Text != "" {
+					texts.WriteString(part.Text)
+				}
+			}
+		}
+		return nil, fmt.Errorf("%w, reply: %s", ErrNoImagesGenerated, texts.String())
+	}
+	return &dto.ImageResponse{
+		Created: common.GetTimestamp(),
+		Data:    data,
+	}, nil
+}
+
+func ChatImageStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
+	var imageData []dto.ImageData
+
+	usage, err := geminiStreamHandler(c, info, resp, func(data string, geminiResponse *dto.GeminiChatResponse) bool {
+		imageData = append(imageData, extractNonThoughtImages(geminiResponse.Candidates)...)
+		return true
+	})
+
+	if err != nil {
+		return usage, err
+	}
+
+	if len(imageData) == 0 {
+		return usage, types.NewOpenAIError(ErrNoImagesGenerated, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+
+	// build final response
+	openAIResponse := &dto.ImageResponse{
+		Created: common.GetTimestamp(),
+		Data:    imageData,
+	}
+
+	jsonResponse, jsonErr := json.Marshal(openAIResponse)
+	if jsonErr != nil {
+		return nil, types.NewError(jsonErr, types.ErrorCodeBadResponseBody)
+	}
+
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(http.StatusOK)
+	_, _ = c.Writer.Write(jsonResponse)
+
+	return usage, nil
+}
+
+func ChatImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
+	responseBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, types.NewOpenAIError(readErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+	service.CloseResponseBodyGracefully(resp)
+
+	if common.DebugEnabled {
+		println("ChatImageHandler response:", string(responseBody))
+	}
+
+	var geminiResponse dto.GeminiChatResponse
+	if jsonErr := common.Unmarshal(responseBody, &geminiResponse); jsonErr != nil {
+		return nil, types.NewOpenAIError(jsonErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+
+	// Check for promptFeedback blockReason
+	if geminiResponse.PromptFeedback != nil && geminiResponse.PromptFeedback.BlockReason != nil {
+		errMsg := fmt.Sprintf("Image generation failed with blockReason: %s", *geminiResponse.PromptFeedback.BlockReason)
+		return nil, types.NewOpenAIError(errors.New(errMsg), types.ErrorCodeBadResponseBody, http.StatusBadRequest)
+	}
+
+	if len(geminiResponse.Candidates) == 0 {
+		return nil, types.NewOpenAIError(errors.New("no images generated"), types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+
+	for _, candidate := range geminiResponse.Candidates {
+		if candidate.FinishReason != nil && *candidate.FinishReason != "STOP" {
+			errMsg := "Image generation failed"
+			if candidate.FinishMessage != nil && *candidate.FinishMessage != "" {
+				errMsg = *candidate.FinishMessage
+			} else if candidate.FinishReason != nil {
+				errMsg = fmt.Sprintf("Image generation failed with reason: %s", *candidate.FinishReason)
+			}
+			return nil, types.NewOpenAIError(errors.New(errMsg), types.ErrorCodeBadResponseBody, http.StatusBadRequest)
+		}
+	}
+
+	usage := &dto.Usage{
+		PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
+		CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount + geminiResponse.UsageMetadata.ThoughtsTokenCount,
+		TotalTokens:      geminiResponse.UsageMetadata.TotalTokenCount,
+	}
+	if usage.TotalTokens == 0 && (usage.PromptTokens > 0 || usage.CompletionTokens > 0) {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+
+	openAIResponse, err := convertToOaiImageResponse(&geminiResponse)
+	if err != nil {
+		return usage, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+	}
+	openAIResponse.Usage = usage
+
+	jsonResponse, jsonErr := json.Marshal(openAIResponse)
+	if jsonErr != nil {
+		return nil, types.NewError(jsonErr, types.ErrorCodeBadResponseBody)
+	}
+
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(resp.StatusCode)
+	_, _ = c.Writer.Write(jsonResponse)
 
 	return usage, nil
 }

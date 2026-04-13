@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -93,33 +92,33 @@ func authHelper(c *gin.Context, minRole int) {
 		}
 	}
 	// get header New-Api-User
-	apiUserIdStr := c.Request.Header.Get("New-Api-User")
-	if apiUserIdStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"message": common.TranslateMessage(c, i18n.MsgAuthUserIdNotProvided),
-		})
-		c.Abort()
-		return
-	}
-	apiUserId, err := strconv.Atoi(apiUserIdStr)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"message": common.TranslateMessage(c, i18n.MsgAuthUserIdFormatError),
-		})
-		c.Abort()
-		return
-
-	}
-	if id != apiUserId {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"message": common.TranslateMessage(c, i18n.MsgAuthUserIdMismatch),
-		})
-		c.Abort()
-		return
-	}
+	//apiUserIdStr := c.Request.Header.Get("New-Api-User")
+	//if apiUserIdStr == "" {
+	//	c.JSON(http.StatusUnauthorized, gin.H{
+	//		"success": false,
+	//		"message": common.TranslateMessage(c, i18n.MsgAuthUserIdNotProvided),
+	//	})
+	//	c.Abort()
+	//	return
+	//}
+	//apiUserId, err := strconv.Atoi(apiUserIdStr)
+	//if err != nil {
+	//	c.JSON(http.StatusUnauthorized, gin.H{
+	//		"success": false,
+	//		"message": common.TranslateMessage(c, i18n.MsgAuthUserIdFormatError),
+	//	})
+	//	c.Abort()
+	//	return
+	//
+	//}
+	//if id != apiUserId {
+	//	c.JSON(http.StatusUnauthorized, gin.H{
+	//		"success": false,
+	//		"message": common.TranslateMessage(c, i18n.MsgAuthUserIdMismatch),
+	//	})
+	//	c.Abort()
+	//	return
+	//}
 	if status.(int) == common.UserStatusDisabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -186,6 +185,157 @@ func UserAuth() func(c *gin.Context) {
 func AdminAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authHelper(c, common.RoleAdminUser)
+	}
+}
+
+func ApiKeyAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		id, ok := session.Get("id").(int)
+		if !ok || id == 0 {
+			accessToken := c.Request.Header.Get("Authorization")
+			if accessToken == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "无权进行此操作，未登录且未提供 access token"})
+				c.Abort()
+				return
+			}
+			user, err := model.ValidateAccessToken(accessToken)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "无权进行此操作，access token 无效"})
+				c.Abort()
+				return
+			}
+			id = user.Id
+		}
+
+		// Check for permission
+		if model.IsAdmin(id) {
+			c.Set("id", id)
+			c.Next()
+			return
+		}
+		if model.HasApiKeyPermission(id) {
+			c.Set("id", id)
+			c.Next()
+			return
+		}
+
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"message": "无权进行此操作，权限不足",
+		})
+		c.Abort()
+	}
+}
+
+func tryGetAccessToken(c *gin.Context) (key string) {
+	session := sessions.Default(c)
+	id := session.Get("id")
+	if id, ok := id.(int); ok && id > 0 {
+		if user, err := model.GetUserById(id, false); err == nil {
+			if user != nil && user.AccessToken != nil {
+				key = *user.AccessToken
+			}
+		}
+	}
+	return
+}
+func TryTokenAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		// 先检测是否为ws
+		if c.Request.Header.Get("Sec-WebSocket-Protocol") != "" {
+			// Sec-WebSocket-Protocol: realtime, openai-insecure-api-key.sk-xxx, openai-beta.realtime-v1
+			// read sk from Sec-WebSocket-Protocol
+			key := c.Request.Header.Get("Sec-WebSocket-Protocol")
+			parts := strings.Split(key, ",")
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				if strings.HasPrefix(part, "openai-insecure-api-key") {
+					key = strings.TrimPrefix(part, "openai-insecure-api-key.")
+					break
+				}
+			}
+			c.Request.Header.Set("Authorization", "Bearer "+key)
+		}
+		// 检查path包含/v1/messages
+		if strings.Contains(c.Request.URL.Path, "/v1/messages") {
+			// 从x-api-key中获取key
+			key := c.Request.Header.Get("x-api-key")
+			if key != "" {
+				c.Request.Header.Set("Authorization", "Bearer "+key)
+			}
+		}
+		// gemini api 从query中获取key
+		if strings.HasPrefix(c.Request.URL.Path, "/v1beta/models/") {
+			skKey := c.Query("key")
+			if skKey != "" {
+				c.Request.Header.Set("Authorization", "Bearer "+skKey)
+			}
+			// 从x-goog-api-key header中获取key
+			xGoogKey := c.Request.Header.Get("x-goog-api-key")
+			if xGoogKey != "" {
+				c.Request.Header.Set("Authorization", "Bearer "+xGoogKey)
+			}
+		}
+
+		key := c.Request.Header.Get("Authorization")
+		parts := make([]string, 0)
+		key = strings.TrimPrefix(key, "Bearer ")
+		if key == "" || key == "midjourney-proxy" {
+			key = c.Request.Header.Get("mj-api-secret")
+			key = strings.TrimPrefix(key, "Bearer ")
+			key = strings.TrimPrefix(key, "sk-")
+			parts = strings.Split(key, "-")
+			key = parts[0]
+		} else if strings.HasPrefix(key, "sk-") {
+			key = strings.TrimPrefix(key, "sk-")
+			parts = strings.Split(key, "-")
+			key = parts[0]
+		}
+
+		if key == "" {
+			key = tryGetAccessToken(c)
+		}
+
+		token, err := model.ValidateUserToken(key)
+		if err != nil {
+			c.Next()
+			return
+		}
+		userCache, err := model.GetUserCache(token.UserId)
+		if err != nil {
+			c.Next()
+			return
+		}
+		if userCache.Status != common.UserStatusEnabled {
+			c.Next()
+			return
+		}
+
+		userCache.WriteContext(c)
+
+		c.Set("id", token.UserId)
+		c.Set("token_id", token.Id)
+		c.Set("token_key", token.Key)
+		c.Set("token_name", token.Name)
+		c.Set("token_unlimited_quota", token.UnlimitedQuota)
+		if !token.UnlimitedQuota {
+			c.Set("token_quota", token.RemainQuota)
+		}
+		if token.ModelLimitsEnabled {
+			c.Set("token_model_limit_enabled", true)
+			c.Set("token_model_limit", token.GetModelLimitsMap())
+		} else {
+			c.Set("token_model_limit_enabled", false)
+		}
+		c.Set("allow_ips", token.GetIpLimits())
+		c.Set("token_group", token.Group)
+		if len(parts) > 1 {
+			if model.IsAdmin(token.UserId) {
+				c.Set("specific_channel_id", parts[1])
+			}
+		}
+		c.Next()
 	}
 }
 
@@ -310,6 +460,7 @@ func TokenAuth() func(c *gin.Context) {
 		// gemini api 从query中获取key
 		if strings.HasPrefix(c.Request.URL.Path, "/v1beta/models") ||
 			strings.HasPrefix(c.Request.URL.Path, "/v1beta/openai/models") ||
+			strings.HasPrefix(c.Request.URL.Path, "/v1beta/interactions") ||
 			strings.HasPrefix(c.Request.URL.Path, "/v1/models/") {
 			skKey := c.Query("key")
 			if skKey != "" {
@@ -321,6 +472,7 @@ func TokenAuth() func(c *gin.Context) {
 				c.Request.Header.Set("Authorization", "Bearer "+xGoogKey)
 			}
 		}
+
 		key := c.Request.Header.Get("Authorization")
 		parts := make([]string, 0)
 		if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
@@ -334,10 +486,13 @@ func TokenAuth() func(c *gin.Context) {
 			key = strings.TrimPrefix(key, "sk-")
 			parts = strings.Split(key, "-")
 			key = parts[0]
-		} else {
+		} else if strings.HasPrefix(key, "sk-") {
 			key = strings.TrimPrefix(key, "sk-")
 			parts = strings.Split(key, "-")
 			key = parts[0]
+		}
+		if key == "" {
+			key = tryGetAccessToken(c)
 		}
 		token, err := model.ValidateUserToken(key)
 		if token != nil {

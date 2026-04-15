@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	pkgerrors "github.com/pkg/errors"
+
 	"github.com/QuantumNous/new-api/common"
 )
 
@@ -34,6 +36,13 @@ const (
 	ErrorTypeRerankError     ErrorType = "rerank_error"
 	ErrorTypeUpstreamError   ErrorType = "upstream_error"
 )
+
+func (e *NewAPIError) upstreamPrefix(msg string) string {
+	if e.errorType != ErrorTypeNewAPIError {
+		return "[up] " + msg
+	}
+	return msg
+}
 
 type ErrorCode string
 
@@ -207,6 +216,7 @@ func (e *NewAPIError) ToOpenAIError() OpenAIError {
 	if result.Message == "" {
 		result.Message = string(e.errorType)
 	}
+	result.Message = e.upstreamPrefix(result.Message)
 	return result
 }
 
@@ -236,6 +246,7 @@ func (e *NewAPIError) ToClaudeError() ClaudeError {
 	if result.Message == "" {
 		result.Message = string(e.errorType)
 	}
+	result.Message = e.upstreamPrefix(result.Message)
 	return result
 }
 
@@ -251,7 +262,7 @@ func NewError(err error, errorCode ErrorCode, ops ...NewAPIErrorOptions) *NewAPI
 		return newErr
 	}
 	e := &NewAPIError{
-		Err:        err,
+		Err:        pkgerrors.WithStack(err),
 		RelayError: nil,
 		errorType:  ErrorTypeNewAPIError,
 		StatusCode: http.StatusInternalServerError,
@@ -298,7 +309,7 @@ func InitOpenAIError(errorCode ErrorCode, statusCode int, ops ...NewAPIErrorOpti
 
 func NewErrorWithStatusCode(err error, errorCode ErrorCode, statusCode int, ops ...NewAPIErrorOptions) *NewAPIError {
 	e := &NewAPIError{
-		Err: err,
+		Err: pkgerrors.WithStack(err),
 		RelayError: OpenAIError{
 			Message: err.Error(),
 			Type:    string(errorCode),

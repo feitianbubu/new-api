@@ -115,6 +115,18 @@ func GetTokenStatus(c *gin.Context) {
 	})
 }
 
+// GetTokenUsage 获取令牌使用情况
+// @Summary 令牌使用详情
+// @Description 通过Bearer token获取令牌的详细使用信息，包括配额、使用量等
+// @Tags User
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param Authorization header string true "Bearer token格式: Bearer sk-xxxxxxxx"
+// @Success 200 {object} object{code=bool,message=string,data=object{object=string,name=string,total_granted=int,total_used=int,total_available=int,unlimited_quota=bool,model_limits=object,model_limits_enabled=bool,expires_at=int64}} "获取成功"
+// @Failure 401 {object} object{success=bool,message=string} "未授权"
+// @Failure 200 {object} object{success=bool,message=string} "令牌不存在或无效"
+// @Router /api/usage/token [get]
 func GetTokenUsage(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
@@ -227,10 +239,8 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-	})
+	cleanToken.Key = key
+	common.ApiSuccess(c, cleanToken)
 }
 
 func DeleteToken(c *gin.Context) {
@@ -298,6 +308,21 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
+
+		// 根据状态自动恢复为已启用
+		switch cleanToken.Status {
+		case common.TokenStatusExhausted:
+			// 如果修改后有额度，自动重置为已启用
+			if cleanToken.RemainQuota > 0 || cleanToken.UnlimitedQuota {
+				cleanToken.Status = common.TokenStatusEnabled
+			}
+		case common.TokenStatusExpired:
+			// 如果修改后的过期时间有效，自动重置为已启用
+			if cleanToken.ExpiredTime > common.GetTimestamp() || cleanToken.ExpiredTime == -1 {
+				cleanToken.Status = common.TokenStatusEnabled
+			}
+		}
+
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
 	}
 	err = cleanToken.Update()

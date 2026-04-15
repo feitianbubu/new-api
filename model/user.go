@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
@@ -35,8 +39,8 @@ type User struct {
 	OidcId           string         `json:"oidc_id" gorm:"column:oidc_id;index"`
 	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
 	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode string         `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
-	AccessToken      *string        `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
+	VerificationCode string         `json:"verification_code" gorm:"-:all"`                            // this field is only for Email verification, don't save it to database!
+	AccessToken      *string        `json:"access_token" gorm:"type:varchar(512);column:access_token"` // this token is for system management
 	Quota            int            `json:"quota" gorm:"type:int;default:0"`
 	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
 	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
@@ -49,6 +53,10 @@ type User struct {
 	DeletedAt        gorm.DeletedAt `gorm:"index"`
 	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
+	Tpm              int            `json:"tpm" gorm:"type:int;default:0;column:tpm"`
+	ApiKey           bool           `json:"api_key" gorm:"column:api_key"`
+	AccessTokenExp   int64          `json:"access_token_exp,omitempty" gorm:"-"`
+	RefreshToken     string         `json:"refresh_token,omitempty" gorm:"-"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	CreatedAt        int64          `json:"created_at" gorm:"autoCreateTime;column:created_at"`
@@ -57,13 +65,16 @@ type User struct {
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:             user.Id,
+		Group:          user.Group,
+		Quota:          user.Quota,
+		Status:         user.Status,
+		Username:       user.Username,
+		DisplayName:    user.DisplayName,
+		Setting:        user.Setting,
+		AccessTokenExp: user.AccessTokenExp,
+		Tpm:            user.Tpm,
+		Email:          user.Email,
 	}
 	return cache
 }
@@ -532,6 +543,8 @@ func (user *User) Edit(updatePassword bool) error {
 		"display_name": newUser.DisplayName,
 		"group":        newUser.Group,
 		"remark":       newUser.Remark,
+		"tpm":          newUser.Tpm,
+		"api_key":      newUser.ApiKey,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
@@ -698,7 +711,7 @@ func IsEmailAlreadyTaken(email string) bool {
 }
 
 func IsWeChatIdAlreadyTaken(wechatId string) bool {
-	return DB.Unscoped().Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected == 1
+	return DB.Where("wechat_id = ?", wechatId).Find(&User{}).RowsAffected == 1
 }
 
 func IsGitHubIdAlreadyTaken(githubId string) bool {
@@ -773,19 +786,11 @@ func IsAdmin(userId int) bool {
 //}
 
 func ValidateAccessToken(token string) (*User, error) {
-	if token == "" {
-		return nil, nil
-	}
-	token = strings.Replace(token, "Bearer ", "", 1)
-	user := &User{}
-	err := DB.Where("access_token = ?", token).First(user).Error
+	user, err := ValidateUnifiedToken(token)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
+		return nil, err
 	}
-	return user, nil
+	return GetUserById(user.Id, true)
 }
 
 // GetUserQuota gets quota from Redis first, falls back to DB if needed
@@ -1080,4 +1085,334 @@ func RootUserExists() bool {
 		return false
 	}
 	return true
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	UserId        int    `json:"user_id"`
+	Username      string `json:"username"`
+	Role          int    `json:"role"`
+	Email         string `json:"email,omitempty"`
+	EmailVerified bool   `json:"email_verified,omitempty"`
+	Name          string `json:"name,omitempty"`
+	PreferredName string `json:"preferred_username,omitempty"`
+}
+
+type RefreshTokenClaims struct {
+	jwt.RegisteredClaims
+	UserId    int    `json:"user_id"`
+	ClientID  string `json:"client_id,omitempty"`
+	TokenType string `json:"token_type"` // "refresh"
+}
+
+// GetUnifiedTokenSigningKey 获取统一的token签名密钥
+// 优先使用common.CryptoSecret，保持向后兼容性
+// 后续可以通过修改此函数来支持其他密钥源
+func GetUnifiedTokenSigningKey() []byte {
+	return []byte(common.CryptoSecret)
+}
+
+// CreateUserJWTOptions JWT生成选项
+type CreateUserJWTOptions struct {
+	ExpirationSeconds int
+	ClientID          string // OIDC客户端ID，可选
+	IncludeOIDCFields bool   // 是否包含OIDC字段
+	IsOIDCToken       bool   // 是否为OIDC token
+}
+
+func defaultExpirationSeconds(c *gin.Context) int {
+	expirationSeconds := common.SessionExpirationSeconds
+	if c == nil {
+		return expirationSeconds
+	}
+	var tokenTTLStr string
+	// 优先从context值获取，其次从查询参数获取
+	if val, exists := c.Get("token_ttl"); exists {
+		if str, ok := val.(string); ok {
+			tokenTTLStr = str
+		}
+	} else {
+		tokenTTLStr = c.Query("token_ttl")
+	}
+
+	return common.ParseTokenTTL(tokenTTLStr, expirationSeconds)
+}
+
+func CreateUserJWT(c *gin.Context, u *User) (string, error) {
+	options := &CreateUserJWTOptions{
+		ExpirationSeconds: defaultExpirationSeconds(c),
+		ClientID:          "new-api",
+		IncludeOIDCFields: true,
+		IsOIDCToken:       true,
+	}
+	return CreateUserJWTWithOptions(c, u, options)
+}
+
+// CreateUserJWTWithOptions 使用选项创建用户JWT
+func CreateUserJWTWithOptions(c *gin.Context, u *User, options *CreateUserJWTOptions) (string, error) {
+	if u == nil {
+		return "", fmt.Errorf("user is nil")
+	}
+
+	// 默认选项
+	if options == nil {
+		options = &CreateUserJWTOptions{}
+	}
+
+	// 默认过期时间
+	expirationSeconds := options.ExpirationSeconds
+	if expirationSeconds == 0 {
+		expirationSeconds = common.SessionExpirationSeconds
+	}
+
+	// 从查询参数或context获取自定义过期时间
+	if c != nil && expirationSeconds == common.SessionExpirationSeconds {
+		var tokenTTLStr string
+		// 优先从context值获取，其次从查询参数获取
+		if val, exists := c.Get("token_ttl"); exists {
+			if str, ok := val.(string); ok {
+				tokenTTLStr = str
+			}
+		} else {
+			tokenTTLStr = c.Query("token_ttl")
+		}
+
+		expirationSeconds = common.ParseTokenTTL(tokenTTLStr, expirationSeconds)
+	}
+
+	expirationTime := time.Now().Add(time.Duration(expirationSeconds) * time.Second)
+
+	// 构建RegisteredClaims
+	registeredClaims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(expirationTime),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+	}
+
+	// 如果是OIDC token，添加标准OIDC字段
+	if options.IsOIDCToken {
+		registeredClaims.Issuer = system_setting.ServerAddress
+		registeredClaims.Subject = fmt.Sprintf("%d", u.Id)
+		if options.ClientID != "" {
+			registeredClaims.Audience = []string{options.ClientID}
+		}
+	}
+
+	claims := &UserClaims{
+		RegisteredClaims: registeredClaims,
+		UserId:           u.Id,
+		Username:         u.Username,
+		Role:             u.Role,
+	}
+
+	// 如果需要包含OIDC字段，添加用户信息
+	if options.IncludeOIDCFields || options.IsOIDCToken {
+		if u.DisplayName != "" {
+			claims.Name = u.DisplayName
+		}
+		claims.PreferredName = u.Username
+		if u.Email != "" {
+			claims.Email = u.Email
+			claims.EmailVerified = true
+		}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(GetUnifiedTokenSigningKey())
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func CreateRefreshToken(u *User) (string, error) {
+	return CreateRefreshTokenWithClient(u, "")
+}
+
+// CreateRefreshTokenWithClient 生成带可选ClientID的RefreshToken，用于OIDC刷新校验
+func CreateRefreshTokenWithClient(u *User, clientID string) (string, error) {
+	if u == nil {
+		return "", fmt.Errorf("user is nil")
+	}
+
+	// RefreshToken固定30天过期
+	expirationTime := time.Now().Add(30 * 24 * time.Hour)
+
+	claims := &RefreshTokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Audience:  jwt.ClaimStrings{},
+		},
+		UserId:    u.Id,
+		ClientID:  clientID,
+		TokenType: "refresh",
+	}
+
+	if clientID != "" {
+		claims.RegisteredClaims.Audience = []string{clientID}
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(GetUnifiedTokenSigningKey())
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func ParseRefreshToken(tokenString string) (*RefreshTokenClaims, error) {
+	tokenString = strings.ReplaceAll(tokenString, "Bearer ", "")
+	claims := &RefreshTokenClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return GetUnifiedTokenSigningKey(), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	if claims.TokenType != "refresh" {
+		return nil, fmt.Errorf("invalid token type, expected refresh")
+	}
+
+	return claims, nil
+}
+
+func GenerateAccessToken(c *gin.Context, user *User) (err error) {
+	key, err := CreateUserJWT(c, user)
+	if err != nil {
+		return
+	}
+	user.SetAccessToken(key)
+
+	if DB.Where("access_token = ?", user.AccessToken).First(user).RowsAffected != 0 {
+		err = fmt.Errorf("access token already exists")
+		return
+	}
+
+	err = user.Update(false)
+	return
+}
+
+//func ParseUserJWT(tokenString string) (*User, error) {
+//	tokenString = strings.ReplaceAll(tokenString, "Bearer ", "")
+//	claims := &UserClaims{}
+//	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+//		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+//			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+//		}
+//		return GetUnifiedTokenSigningKey(), nil
+//	})
+//
+//	if err != nil {
+//		common.SysLog("failed to parse token: " + err.Error() + " token: " + tokenString)
+//		return nil, err
+//	}
+//
+//	if token.Valid {
+//		user := &User{
+//			Id:             claims.UserId,
+//			Username:       claims.Username,
+//			Role:           claims.Role,
+//			AccessTokenExp: claims.ExpiresAt.Unix(),
+//			Email:          claims.Email,
+//			DisplayName:    claims.Name,
+//		}
+//		return user, nil
+//	}
+//
+//	return nil, fmt.Errorf("invalid token")
+//}
+
+// ValidateUnifiedToken 统一的token验证函数，优先验证普通access_token
+// 如果普通token验证失败，尝试OIDC token验证
+func ValidateUnifiedToken(tokenString string) (*User, error) {
+	// 清理token前缀
+	tokenString = strings.ReplaceAll(tokenString, "Bearer ", "")
+
+	if tokenString == "" {
+		return nil, fmt.Errorf("empty token")
+	}
+
+	// 优先尝试普通用户token验证
+	//user, err := ParseUserJWT(tokenString)
+	//if err == nil && user != nil {
+	//	return user, nil
+	//}
+
+	// 普通token验证失败，尝试OIDC token验证
+	user, err := ParseOIDCTokenAsUser(tokenString)
+	if err == nil && user != nil {
+		return user, nil
+	}
+
+	// 两种验证都失败，返回原始错误
+	return nil, fmt.Errorf("failed to validate token with both standard and OIDC methods")
+}
+
+// ParseOIDCTokenAsUser 解析OIDC token并转换为User结构
+func ParseOIDCTokenAsUser(tokenString string) (*User, error) {
+	claims := &UserClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return GetUnifiedTokenSigningKey(), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if token.Valid {
+		// 从Subject解析用户ID
+		userID := 0
+		if claims.Subject != "" {
+			if id, err := strconv.Atoi(claims.Subject); err == nil {
+				userID = id
+			}
+		}
+		if userID == 0 {
+			userID = claims.UserId // 回退到UserId字段
+		}
+
+		user := &User{
+			Id:             userID,
+			Username:       claims.PreferredName, // OIDC中使用preferred_username
+			Role:           claims.Role,
+			AccessTokenExp: claims.ExpiresAt.Unix(),
+			Email:          claims.Email,
+			DisplayName:    claims.Name,
+		}
+
+		// 如果preferred_username为空，尝试从其他字段获取用户名
+		if user.Username == "" && claims.Subject != "" {
+			user.Username = claims.Subject
+		}
+
+		return user, nil
+	}
+
+	return nil, fmt.Errorf("invalid OIDC token")
+}
+
+func HasApiKeyPermission(userId int) bool {
+	if userId == 0 {
+		return false
+	}
+	user, err := GetUserById(userId, true)
+	if err != nil {
+		return false
+	}
+	return user.ApiKey
 }

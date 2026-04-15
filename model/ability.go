@@ -63,10 +63,10 @@ func GetAllEnableAbilities() []Ability {
 func getPriority(group string, model string, retry int) (int, error) {
 
 	var priorities []int
-	err := DB.Model(&Ability{}).
+	err := getAbilityDB().
 		Select("DISTINCT(priority)").
 		Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true).
-		Order("priority DESC").              // 按优先级降序排序
+		Order("priority DESC"). // 按优先级降序排序
 		Pluck("priority", &priorities).Error // Pluck用于将查询的结果直接扫描到一个切片中
 
 	if err != nil {
@@ -91,14 +91,14 @@ func getPriority(group string, model string, retry int) (int, error) {
 }
 
 func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
-	maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true)
-	channelQuery := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = (?)", group, model, true, maxPrioritySubQuery)
+	maxPrioritySubQuery := getAbilityDB().Select("MAX(priority)").Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, model, true)
+	channelQuery := getAbilityDB().Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = (?)", group, model, true, maxPrioritySubQuery)
 	if retry != 0 {
 		priority, err := getPriority(group, model, retry)
 		if err != nil {
 			return nil, err
 		} else {
-			channelQuery = DB.Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = ?", group, model, true, priority)
+			channelQuery = getAbilityDB().Where(commonGroupCol+" = ? and model = ? and enabled = ? and priority = ?", group, model, true, priority)
 		}
 	}
 
@@ -126,15 +126,19 @@ func GetChannel(group string, model string, retry int, requestPath string) (*Cha
 	if len(abilities) > 0 {
 		// Randomly choose one
 		weightSum := uint(0)
+		zeroWeight := uint(0)
+		if lo.EveryBy(abilities, func(ability Ability) bool { return ability.Weight == 0 }) {
+			zeroWeight = 10
+		}
 		for _, ability_ := range abilities {
-			weightSum += ability_.Weight + 10
+			weightSum += ability_.Weight + zeroWeight
 		}
 		// Randomly choose one
 		weight := common.GetRandomInt(int(weightSum))
 		for _, ability_ := range abilities {
-			weight -= int(ability_.Weight) + 10
+			weight -= int(ability_.Weight + zeroWeight)
 			//log.Printf("weight: %d, ability weight: %d", weight, *ability_.Weight)
-			if weight <= 0 {
+			if weight < 0 {
 				channel.Id = ability_.ChannelId
 				break
 			}

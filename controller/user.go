@@ -129,6 +129,9 @@ func recordLoginAudit(user *model.User, c *gin.Context) {
 
 // setup session & cookies and then return user info
 func setupLogin(user *model.User, c *gin.Context) {
+	if _, exists := c.Get("token_ttl"); !exists {
+		c.Set("token_ttl", c.DefaultQuery("token_ttl", common.LoginTokenTTLStr))
+	}
 	model.UpdateUserLastLoginAt(user.Id)
 	session := sessions.Default(c)
 	session.Set("id", user.Id)

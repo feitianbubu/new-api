@@ -2,6 +2,7 @@ package common
 
 import (
 	"crypto/tls"
+	"fmt"
 	//"os"
 	//"strconv"
 	"strings"
@@ -140,6 +141,19 @@ var TurnstileSecretKey = ""
 
 var TelegramBotToken = ""
 var TelegramBotName = ""
+
+// ============================ 额外新增定义配置
+const (
+	DaySeconds               = 24 * 60 * 60
+	SessionExpirationSeconds = DaySeconds
+	LoginTokenTTLSeconds     = 7 * DaySeconds  // 与session cookie MaxAge一致
+	MaxTokenTTLSeconds       = 30 * DaySeconds // 最大token有效期：30天
+)
+
+var (
+	LoginTokenTTLStr = fmt.Sprintf("%dh", LoginTokenTTLSeconds/3600)
+	MaxTokenTTL      = time.Duration(MaxTokenTTLSeconds) * time.Second
+)
 
 var QuotaForNewUser = 0
 var QuotaForInviter = 0

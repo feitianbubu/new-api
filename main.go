@@ -308,6 +308,10 @@ func InitResources() error {
 		return err
 	}
 
+	// Initialize OSS upload worker
+	model.InitOSSUploadWorker()
+
+
 	perfmetrics.Init()
 
 	// 启动系统监控

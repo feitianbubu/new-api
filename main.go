@@ -174,17 +174,18 @@ func main() {
 	server.Use(middleware.RequestId())
 	server.Use(middleware.PoweredBy())
 	server.Use(middleware.I18n())
-	middleware.SetUpLogger(server)
 	// Initialize session store
 	store := cookie.NewStore([]byte(common.SessionSecret))
 	store.Options(sessions.Options{
 		Path:     "/",
-		MaxAge:   2592000, // 30 days
+		MaxAge:   common.LoginTokenTTLSeconds,
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 	server.Use(sessions.Sessions("session", store))
+
+	middleware.SetUpLogger(server)
 
 	InjectUmamiAnalytics()
 	InjectGoogleAnalytics()

@@ -47,6 +47,10 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		return a.convertASRRequest(c, info, request)
+	}
+
 	if info.RelayMode != constant.RelayModeAudioSpeech {
 		return nil, errors.New("unsupported audio relay mode")
 	}
@@ -85,6 +89,12 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 		},
 	}
 
+	// 需要将cluster换成volcano_icl，voice_type传声音id
+	// 文档:https://www.volcengine.com/docs/6561/1305191?lang=zh
+	if strings.HasPrefix(voiceType, "S_") {
+		volcRequest.App.Cluster = "volcano_icl"
+	}
+
 	if len(request.Metadata) > 0 {
 		if err = json.Unmarshal(request.Metadata, &volcRequest); err != nil {
 			return nil, fmt.Errorf("error unmarshalling metadata to volcengine request: %w", err)
@@ -109,108 +119,11 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInf
 	switch info.RelayMode {
 	case constant.RelayModeImagesGenerations:
 		return request, nil
-	// 根据官方文档,并没有发现豆包生图支持表单请求:https://www.volcengine.com/docs/82379/1824121
-	//case constant.RelayModeImagesEdits:
-	//
-	//	var requestBody bytes.Buffer
-	//	writer := multipart.NewWriter(&requestBody)
-	//
-	//	writer.WriteField("model", request.Model)
-	//
-	//	formData := c.Request.PostForm
-	//	for key, values := range formData {
-	//		if key == "model" {
-	//			continue
-	//		}
-	//		for _, value := range values {
-	//			writer.WriteField(key, value)
-	//		}
-	//	}
-	//
-	//	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
-	//		return nil, errors.New("failed to parse multipart form")
-	//	}
-	//
-	//	if c.Request.MultipartForm != nil && c.Request.MultipartForm.File != nil {
-	//		var imageFiles []*multipart.FileHeader
-	//		var exists bool
-	//
-	//		if imageFiles, exists = c.Request.MultipartForm.File["image"]; !exists || len(imageFiles) == 0 {
-	//			if imageFiles, exists = c.Request.MultipartForm.File["image[]"]; !exists || len(imageFiles) == 0 {
-	//				foundArrayImages := false
-	//				for fieldName, files := range c.Request.MultipartForm.File {
-	//					if strings.HasPrefix(fieldName, "image[") && len(files) > 0 {
-	//						foundArrayImages = true
-	//						for _, file := range files {
-	//							imageFiles = append(imageFiles, file)
-	//						}
-	//					}
-	//				}
-	//
-	//				if !foundArrayImages && (len(imageFiles) == 0) {
-	//					return nil, errors.New("image is required")
-	//				}
-	//			}
-	//		}
-	//
-	//		for i, fileHeader := range imageFiles {
-	//			file, err := fileHeader.Open()
-	//			if err != nil {
-	//				return nil, fmt.Errorf("failed to open image file %d: %w", i, err)
-	//			}
-	//			defer file.Close()
-	//
-	//			fieldName := "image"
-	//			if len(imageFiles) > 1 {
-	//				fieldName = "image[]"
-	//			}
-	//
-	//			mimeType := detectImageMimeType(fileHeader.Filename)
-	//
-	//			h := make(textproto.MIMEHeader)
-	//			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileHeader.Filename))
-	//			h.Set("Content-Type", mimeType)
-	//
-	//			part, err := writer.CreatePart(h)
-	//			if err != nil {
-	//				return nil, fmt.Errorf("create form part failed for image %d: %w", i, err)
-	//			}
-	//
-	//			if _, err := io.Copy(part, file); err != nil {
-	//				return nil, fmt.Errorf("copy file failed for image %d: %w", i, err)
-	//			}
-	//		}
-	//
-	//		if maskFiles, exists := c.Request.MultipartForm.File["mask"]; exists && len(maskFiles) > 0 {
-	//			maskFile, err := maskFiles[0].Open()
-	//			if err != nil {
-	//				return nil, errors.New("failed to open mask file")
-	//			}
-	//			defer maskFile.Close()
-	//
-	//			mimeType := detectImageMimeType(maskFiles[0].Filename)
-	//
-	//			h := make(textproto.MIMEHeader)
-	//			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="mask"; filename="%s"`, maskFiles[0].Filename))
-	//			h.Set("Content-Type", mimeType)
-	//
-	//			maskPart, err := writer.CreatePart(h)
-	//			if err != nil {
-	//				return nil, errors.New("create form file failed for mask")
-	//			}
-	//
-	//			if _, err := io.Copy(maskPart, maskFile); err != nil {
-	//				return nil, errors.New("copy mask file failed")
-	//			}
-	//		}
-	//	} else {
-	//		return nil, errors.New("no multipart form data found")
-	//	}
-	//
-	//	writer.Close()
-	//	c.Request.Header.Set("Content-Type", writer.FormDataContentType())
-	//	return bytes.NewReader(requestBody.Bytes()), nil
-
+	case constant.RelayModeImagesEdits:
+		if c.ContentType() == gin.MIMEMultipartPOSTForm {
+			return convertImageFileToURL(c, request)
+		}
+		return request, nil
 	default:
 		return request, nil
 	}
@@ -263,6 +176,9 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			}
 			return fmt.Sprintf("%s/api/v3/chat/completions", baseUrl), nil
 		case constant.RelayModeEmbeddings:
+			if IsMultimodalEmbeddingModel(info.UpstreamModelName) {
+				return fmt.Sprintf("%s/api/v3/embeddings/multimodal", baseUrl), nil
+			}
 			return fmt.Sprintf("%s/api/v3/embeddings", baseUrl), nil
 		//豆包的图生图也走generations接口: https://www.volcengine.com/docs/82379/1824121
 		case constant.RelayModeImagesGenerations, constant.RelayModeImagesEdits:
@@ -273,6 +189,8 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			return fmt.Sprintf("%s/api/v3/rerank", baseUrl), nil
 		case constant.RelayModeResponses:
 			return fmt.Sprintf("%s/api/v3/responses", baseUrl), nil
+		case constant.RelayModeAudioTranscription:
+			return asrSubmitURL, nil
 		case constant.RelayModeAudioSpeech:
 			if baseUrl == channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeVolcEngine] {
 				return "wss://openspeech.bytedance.com/api/v1/tts/ws_binary", nil
@@ -286,6 +204,17 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
+
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		req.Set("X-Api-Key", info.ApiKey)
+		req.Set("X-Api-Resource-Id", asrResourceID)
+		if requestID, exists := c.Get(contextKeyASRRequestID); exists {
+			req.Set("X-Api-Request-Id", requestID.(string))
+		}
+		req.Set("X-Api-Sequence", "-1")
+		req.Set("Content-Type", "application/json")
+		return nil
+	}
 
 	if info.RelayMode == constant.RelayModeAudioSpeech {
 		parts := strings.Split(info.ApiKey, "|")
@@ -322,6 +251,9 @@ func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dt
 }
 
 func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.EmbeddingRequest) (any, error) {
+	if IsMultimodalEmbeddingModel(info.UpstreamModelName) {
+		return convertToMultimodalEmbeddingRequest(request)
+	}
 	return request, nil
 }
 
@@ -330,6 +262,15 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		bodyBytes, err := io.ReadAll(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read ASR request body: %w", err)
+		}
+		c.Set(contextKeyASRSubmitBody, bodyBytes)
+		return nil, nil
+	}
+
 	if info.RelayMode == constant.RelayModeAudioSpeech {
 		baseUrl := info.ChannelBaseUrl
 		if baseUrl == "" {
@@ -346,6 +287,10 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (usage any, err *types.NewAPIError) {
+	if info.RelayMode == constant.RelayModeAudioTranscription {
+		return handleASRResponse(c, info)
+	}
+
 	if info.RelayFormat == types.RelayFormatClaude {
 		if _, ok := channelconstant.ChannelSpecialBases[info.ChannelBaseUrl]; ok {
 			adaptor := claude.Adaptor{}

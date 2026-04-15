@@ -74,6 +74,7 @@ func InitOptionMap() {
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
 	common.OptionMap["WorkerValidKey"] = system_setting.WorkerValidKey
 	common.OptionMap["WorkerAllowHttpImageRequestEnabled"] = strconv.FormatBool(system_setting.WorkerAllowHttpImageRequestEnabled)
+	common.OptionMap["VolcAssetConfig"] = volcAssetConfig2JSONString()
 	common.OptionMap["PayAddress"] = ""
 	common.OptionMap["CustomCallbackAddress"] = ""
 	common.OptionMap["EpayId"] = ""
@@ -126,6 +127,7 @@ func InitOptionMap() {
 	common.OptionMap["WeChatServerAddress"] = ""
 	common.OptionMap["WeChatServerToken"] = ""
 	common.OptionMap["WeChatAccountQRCodeImageURL"] = ""
+	common.OptionMap["WeChatDirectLoginEnabled"] = strconv.FormatBool(common.WeChatDirectLoginEnabled)
 	common.OptionMap["TurnstileSiteKey"] = ""
 	common.OptionMap["TurnstileSecretKey"] = ""
 	common.OptionMap["QuotaForNewUser"] = strconv.Itoa(common.QuotaForNewUser)
@@ -173,6 +175,9 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
 	common.OptionMap["AutomaticRetryStatusCodes"] = operation_setting.AutomaticRetryStatusCodesToString()
 	common.OptionMap["ExposeRatioEnabled"] = strconv.FormatBool(ratio_setting.IsExposeRatioEnabled())
+
+	// 支付配置
+	common.OptionMap["EpayEnabled"] = strconv.FormatBool(setting.EpayEnabled)
 
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
@@ -354,6 +359,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.SMTPForceAuthLogin = boolValue
 		case "WorkerAllowHttpImageRequestEnabled":
 			system_setting.WorkerAllowHttpImageRequestEnabled = boolValue
+		case "EpayEnabled":
+			setting.EpayEnabled = boolValue
 		case "DefaultUseAutoGroup":
 			setting.DefaultUseAutoGroup = boolValue
 		case "ExposeRatioEnabled":
@@ -486,6 +493,10 @@ func updateOptionMap(key string, value string) (err error) {
 		common.WeChatServerToken = value
 	case "WeChatAccountQRCodeImageURL":
 		common.WeChatAccountQRCodeImageURL = value
+	case "WeChatDirectLoginEnabled":
+		common.WeChatDirectLoginEnabled = value == "true"
+	case "VolcAssetConfig":
+		err = updateVolcAssetConfigByJSONString(value)
 	case "TelegramBotToken":
 		common.TelegramBotToken = value
 	case "TelegramBotName":
@@ -605,4 +616,18 @@ func handleConfigUpdate(key, value string) bool {
 	}
 
 	return true // 已处理
+}
+
+func volcAssetConfig2JSONString() string {
+	data, _ := common.Marshal(system_setting.VolcAssetConfig)
+	return string(data)
+}
+
+func updateVolcAssetConfigByJSONString(value string) error {
+	var cfg system_setting.VolcAssetSettings
+	if err := common.UnmarshalJsonStr(value, &cfg); err != nil {
+		return err
+	}
+	system_setting.VolcAssetConfig = cfg
+	return nil
 }

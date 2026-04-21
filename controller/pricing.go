@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"sort"
+
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -63,6 +65,10 @@ func GetPricing(c *gin.Context) {
 			delete(groupRatio, group)
 		}
 	}
+
+	sort.Slice(pricing, func(i, j int) bool {
+		return pricing[i].CreatedTime > pricing[j].CreatedTime
+	})
 
 	c.JSON(200, gin.H{
 		"success":            true,

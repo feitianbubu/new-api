@@ -284,6 +284,13 @@ func SetApiRouter(router *gin.Engine) {
 			tokenRoute.POST("/batch/keys", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetTokenKeysBatch)
 		}
 
+		filesRoute := apiRouter.Group("/files")
+		filesRoute.Use(middleware.UserAuth())
+		{
+			filesRoute.GET("", controller.ListFiles)
+			filesRoute.Match([]string{"GET", "HEAD"}, "/:file_id/content", middleware.HeadMethodHandler(), controller.GetFileContent)
+		}
+
 		usageRoute := apiRouter.Group("/usage")
 		usageRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{

@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/samber/lo"
 )
 
 type Pricing struct {
@@ -21,7 +22,9 @@ type Pricing struct {
 	Icon                   string                  `json:"icon,omitempty"`
 	Tags                   string                  `json:"tags,omitempty"`
 	VendorID               int                     `json:"vendor_id,omitempty"`
+	BaseModel              string                  `json:"base_model,omitempty"`
 	QuotaType              int                     `json:"quota_type"`
+	QuotaShowType          constant.QuotaShowType  `json:"quota_show_type,omitempty"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
 	OwnerBy                string                  `json:"owner_by"`
@@ -35,6 +38,8 @@ type Pricing struct {
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	BillingMode            string                  `json:"billing_mode,omitempty"`
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
+	CreatedTime            int64                   `json:"created_time,omitempty"`
+	UpdatedTime            int64                   `json:"updated_time,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
 }
 
@@ -296,13 +301,17 @@ func updatePricing() {
 		// 补充模型元数据（描述、标签、供应商、状态）
 		if meta, ok := metaMap[model]; ok {
 			// 若模型被禁用(status!=1)，则直接跳过，不返回给前端
-			if meta.Status != 1 {
+			// Id==0 表示该模型未配置，不返回给前端
+			if meta.Status != 1 || meta.Id == 0 {
 				continue
 			}
 			pricing.Description = meta.Description
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
+			pricing.BaseModel = ExtractBaseModel(model, meta.BaseModel)
+			pricing.CreatedTime = meta.CreatedTime
+			pricing.UpdatedTime = meta.UpdatedTime
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
@@ -314,6 +323,7 @@ func updatePricing() {
 			pricing.CompletionRatio = ratio_setting.GetCompletionRatio(model)
 			pricing.QuotaType = 0
 		}
+		pricing.QuotaShowType = quotaShowType(model, pricing.Tags, enableAbilities)
 		if cacheRatio, ok := ratio_setting.GetCacheRatio(model); ok {
 			pricing.CacheRatio = &cacheRatio
 		}
@@ -356,6 +366,30 @@ func updatePricing() {
 	modelEnableGroupsLock.Unlock()
 
 	lastGetPricingTime = time.Now()
+}
+
+func quotaShowType(model string, tags string, enableAbilities []AbilityWithChannel) constant.QuotaShowType {
+	if ability, ok := lo.Find(enableAbilities, func(c AbilityWithChannel) bool {
+		return c.Model == model
+	}); ok {
+		switch ability.ChannelType {
+		case constant.ChannelTypeJimeng, constant.ChannelTypeAli:
+			if strings.Contains(tags, "video") {
+				return constant.QuotaShowTypeSecond
+			}
+		case constant.ChannelTypeVidu, constant.ChannelTypeKling:
+			return constant.QuotaShowTypeCredit
+		}
+	}
+	for _, tag := range strings.Split(tags, ",") {
+		switch strings.TrimSpace(tag) {
+		case string(constant.QuotaShowTypeSecond):
+			return constant.QuotaShowTypeSecond
+		case string(constant.QuotaShowTypeCredit):
+			return constant.QuotaShowTypeCredit
+		}
+	}
+	return ""
 }
 
 // GetSupportedEndpointMap 返回全局端点到路径的映射

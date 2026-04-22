@@ -431,6 +431,13 @@ func GenRelayInfoOpenAI(c *gin.Context, request dto.Request) *RelayInfo {
 	return info
 }
 
+func GenRelayInfoInteractions(c *gin.Context, request dto.Request) *RelayInfo {
+	info := genBaseRelayInfo(c, request)
+	info.RelayFormat = types.RelayFormatInteractions
+	info.ShouldIncludeUsage = false
+	return info
+}
+
 func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 
 	//channelType := common.GetContextKeyInt(c, constant.ContextKeyChannelType)
@@ -559,6 +566,8 @@ func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Req
 		info = GenRelayInfoGemini(c, request)
 	case types.RelayFormatEmbedding:
 		info = GenRelayInfoEmbedding(c, request)
+	case types.RelayFormatInteractions:
+		info = GenRelayInfoInteractions(c, request)
 	case types.RelayFormatOpenAIResponses:
 		if request, ok := request.(*dto.OpenAIResponsesRequest); ok {
 			info = GenRelayInfoResponses(c, request)
@@ -732,19 +741,17 @@ func (t *TaskSubmitReq) UnmarshalJSON(data []byte) error {
 	}
 
 	if len(aux.Metadata) > 0 {
+		metadataBytes := []byte(aux.Metadata)
 		var metadataStr string
-		if err := common.Unmarshal(aux.Metadata, &metadataStr); err == nil && metadataStr != "" {
-			var metadataObj map[string]interface{}
-			if err := common.Unmarshal([]byte(metadataStr), &metadataObj); err == nil {
-				t.Metadata = metadataObj
-				return nil
-			}
+		if err := common.Unmarshal(aux.Metadata, &metadataStr); err == nil {
+			metadataBytes = []byte(metadataStr)
 		}
 
 		var metadataObj map[string]interface{}
-		if err := common.Unmarshal(aux.Metadata, &metadataObj); err == nil {
-			t.Metadata = metadataObj
+		if err := common.Unmarshal(metadataBytes, &metadataObj); err != nil {
+			return fmt.Errorf("metadata must be a valid JSON object")
 		}
+		t.Metadata = metadataObj
 	}
 
 	return nil

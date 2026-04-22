@@ -91,6 +91,10 @@ func NewProxyHttpClient(proxyURL string) (*http.Client, error) {
 		return http.DefaultClient, nil
 	}
 
+	if !isValidProxy(proxyURL) {
+		return GetHttpClient(), nil
+	}
+
 	proxyClientLock.Lock()
 	if client, ok := proxyClients[proxyURL]; ok {
 		proxyClientLock.Unlock()

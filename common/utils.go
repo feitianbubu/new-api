@@ -334,3 +334,17 @@ func BuildURL(base string, endpoint string) string {
 	}
 	return u.ResolveReference(ref).String()
 }
+
+func ParseTokenTTL(ttlStr string, defaultSeconds int) int {
+	if ttlStr == "" {
+		return defaultSeconds
+	}
+	duration, err := time.ParseDuration(ttlStr)
+	if err != nil {
+		return defaultSeconds
+	}
+	if duration < time.Hour || duration > MaxTokenTTL {
+		return defaultSeconds
+	}
+	return int(duration.Seconds())
+}

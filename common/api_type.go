@@ -73,6 +73,8 @@ func ChannelType2APIType(channelType int) (int, bool) {
 		apiType = constant.APITypeMiniMax
 	case constant.ChannelTypeReplicate:
 		apiType = constant.APITypeReplicate
+	case constant.ChannelTypeVidu:
+		apiType = constant.APITypeVidu
 	case constant.ChannelTypeCodex:
 		apiType = constant.APITypeCodex
 	}

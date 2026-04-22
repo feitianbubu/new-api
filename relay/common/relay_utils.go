@@ -1,7 +1,11 @@
 package common
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 
 	"github.com/gin-gonic/gin"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/samber/lo"
 )
 
@@ -51,7 +56,7 @@ func createTaskError(err error, code string, statusCode int, localError bool) *d
 		Message:    err.Error(),
 		StatusCode: statusCode,
 		LocalError: localError,
-		Error:      err,
+		Error:      pkgerrors.WithStack(err),
 	}
 }
 
@@ -221,4 +226,83 @@ func ValidateBasicTaskRequest(c *gin.Context, info *RelayInfo, action string) *d
 
 	storeTaskRequest(c, info, action, req)
 	return nil
+}
+func GetImagesBase64sFromForm(c *gin.Context) ([]*Base64Data, error) {
+	return GetBase64sFromForm(c, "image", "image[]")
+}
+func GetImageBase64sFromForm(c *gin.Context) ([]*Base64Data, error) {
+	base64s, err := GetImagesBase64sFromForm(c)
+	if err != nil {
+		return nil, err
+	}
+	return base64s, nil
+}
+
+type Base64Data struct {
+	MimeType string
+	Data     string
+}
+
+func (m Base64Data) String() string {
+	return fmt.Sprintf("data:%s;base64,%s", m.MimeType, m.Data)
+}
+func GetBase64sFromForm(c *gin.Context, fieldNames ...string) ([]*Base64Data, error) {
+	mf := c.Request.MultipartForm
+	if mf == nil {
+		if _, err := c.MultipartForm(); err != nil {
+			return nil, fmt.Errorf("failed to parse image edit form request: %w", err)
+		}
+		mf = c.Request.MultipartForm
+	}
+	var imageFiles []*multipart.FileHeader
+	for _, fieldName := range fieldNames {
+		if files, exists := mf.File[fieldName]; exists && len(files) > 0 {
+			imageFiles = append(imageFiles, files...)
+		}
+	}
+	if len(imageFiles) == 0 {
+		return nil, fmt.Errorf("field %s is not found or empty", strings.Join(fieldNames, "/"))
+	}
+	var imageBase64s []*Base64Data
+	for _, file := range imageFiles {
+		b64, err := encodeFileToBase64(file)
+		if err != nil {
+			return nil, err
+		}
+		imageBase64s = append(imageBase64s, b64)
+	}
+	return imageBase64s, nil
+}
+
+func encodeFileToBase64(file *multipart.FileHeader) (*Base64Data, error) {
+	image, err := file.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open image file: %w", err)
+	}
+	defer func() { _ = image.Close() }()
+
+	sniff := make([]byte, 512)
+	n, err := io.ReadFull(image, sniff)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, fmt.Errorf("read image file: %w", err)
+	}
+	mimeType := http.DetectContentType(sniff[:n])
+
+	if _, err := image.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("seek image file: %w", err)
+	}
+
+	var buf strings.Builder
+	buf.Grow(base64.StdEncoding.EncodedLen(int(file.Size)))
+	enc := base64.NewEncoder(base64.StdEncoding, &buf)
+	_, copyErr := io.Copy(enc, image)
+	closeErr := enc.Close()
+	if copyErr != nil {
+		return nil, fmt.Errorf("encode image file: %w", copyErr)
+	}
+	if closeErr != nil {
+		return nil, fmt.Errorf("finalize base64 encoding: %w", closeErr)
+	}
+
+	return &Base64Data{MimeType: mimeType, Data: buf.String()}, nil
 }

@@ -193,6 +193,17 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		}
 	}
 
+	if err := appendFileToImages(c); err != nil {
+		return nil, service.TaskErrorWrapper(err, "append_file_to_images_failed", http.StatusInternalServerError)
+	}
+	// 8. 构建请求体
+	requestBody, err := adaptor.BuildRequestBody(c, info)
+	if err != nil {
+		return nil, service.TaskErrorWrapper(err, "build_request_failed", http.StatusInternalServerError)
+	}
+
+	common.SetChannelRequestBodyFromReader(c, requestBody)
+
 	// 6. 将 OtherRatios 应用到基础额度
 	if !common.StringsContains(constant.TaskPricePatches, modelName) {
 		for _, ra := range info.PriceData.OtherRatios {
@@ -201,7 +212,6 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 			}
 		}
 	}
-
 	// 7. 预扣费（仅首次 — 重试时 info.Billing 已存在，跳过）
 	if info.Billing == nil && !info.PriceData.FreeModel {
 		info.ForcePreConsume = true
@@ -210,18 +220,12 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		}
 	}
 
-	// 8. 构建请求体
-	requestBody, err := adaptor.BuildRequestBody(c, info)
-	if err != nil {
-		return nil, service.TaskErrorWrapper(err, "build_request_failed", http.StatusInternalServerError)
-	}
-
 	// 9. 发送请求
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
 		return nil, service.TaskErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
-	if resp != nil && resp.StatusCode != http.StatusOK {
+	if resp != nil && (resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices) {
 		responseBody, _ := io.ReadAll(resp.Body)
 		return nil, service.TaskErrorWrapper(fmt.Errorf("%s", string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
 	}
@@ -276,6 +280,33 @@ func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float6
 		}
 	}
 	return int(result)
+}
+
+func appendFileToImages(c *gin.Context) error {
+	imageFiles, err := channel.ExtractImageFilesFromMultipart(c, []string{"input_reference", "image", "file"})
+	if err != nil {
+		return fmt.Errorf("extract_image_files_failed: %w", err)
+	}
+	if len(imageFiles) == 0 {
+		return nil
+	}
+	taskReq, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return err
+	}
+	for _, imageFile := range imageFiles {
+		userID := channel.GetUserIDFromContext(c)
+		imageURL, err := channel.UploadImageFile(c, imageFile, userID, channel.ImageUploadOptions{
+			Purpose:        "task_input_reference",
+			ExpiresSeconds: 7200,
+		})
+		if err != nil {
+			return fmt.Errorf("upload_image_file_failed: %w", err)
+		}
+		taskReq.Images = append(taskReq.Images, imageURL)
+	}
+	c.Set("task_request", taskReq)
+	return nil
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
@@ -367,6 +398,9 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 	userId := c.GetInt("id")
 
 	originTask, exist, err := model.GetByTaskId(userId, taskId)
+	if !exist && model.IsAdmin(userId) {
+		originTask, exist, err = model.GetByOnlyTaskId(taskId)
+	}
 	if err != nil {
 		taskResp = service.TaskErrorWrapper(err, "get_task_failed", http.StatusInternalServerError)
 		return
@@ -468,6 +502,7 @@ func tryRealtimeFetch(task *model.Task, isOpenAIVideoAPI bool) []byte {
 		// data: URI — kept in Data, not ResultURL
 	} else if ti.Url != "" {
 		task.PrivateData.ResultURL = ti.Url
+		task.Url = ti.Url
 	} else if task.Status == model.TaskStatusSuccess {
 		// No URL from adaptor — construct proxy URL using public task ID
 		task.PrivateData.ResultURL = taskcommon.BuildProxyURL(task.TaskID)

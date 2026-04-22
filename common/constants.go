@@ -111,7 +111,9 @@ var EmailLoginAuthServerList = []string{
 }
 
 var DebugEnabled bool
+var SqlLogEnabled bool
 var MemoryCacheEnabled bool
+var ResponseLogEnabled bool
 
 var LogConsumeEnabled = true
 
@@ -125,7 +127,6 @@ var SMTPForceAuthLogin = false
 var SMTPAccount = ""
 var SMTPFrom = ""
 var SMTPToken = ""
-
 var GitHubClientId = ""
 var GitHubClientSecret = ""
 var LinuxDOClientId = ""
@@ -135,6 +136,7 @@ var LinuxDOMinimumTrustLevel = 0
 var WeChatServerAddress = ""
 var WeChatServerToken = ""
 var WeChatAccountQRCodeImageURL = ""
+var WeChatDirectLoginEnabled = false // 扫码直接登录开关，false使用验证码登录，true使用扫码直接登录
 
 var TurnstileSiteKey = ""
 var TurnstileSecretKey = ""
@@ -169,6 +171,7 @@ var RetryTimes = 0
 //var RootUserEmail = ""
 
 var IsMasterNode bool
+var IsAutoMigrate bool
 
 // NodeName 节点名称，从 NODE_NAME 环境变量读取；
 // 用于审计日志中标识节点身份，在容器/K8s 部署时比自动探测到的容器内网 IP 更具可读性。

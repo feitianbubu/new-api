@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/url"
+	"path/filepath"
+	"strings"
 
 	"github.com/abema/go-mp4"
 	"github.com/go-audio/aiff"
@@ -15,6 +18,25 @@ import (
 	"github.com/tcolgate/mp3"
 	"github.com/yapingcat/gomedia/go-codec"
 )
+
+var audioMimeTypeToExtension = map[string]string{
+	"audio/mpeg":     ".mp3",
+	"audio/mp3":      ".mp3",
+	"audio/wav":      ".wav",
+	"audio/x-wav":    ".wav",
+	"audio/wave":     ".wav",
+	"audio/x-pn-wav": ".wav",
+	"audio/flac":     ".flac",
+	"audio/x-flac":   ".flac",
+	"audio/mp4":      ".m4a",
+	"audio/x-m4a":    ".m4a",
+	"audio/ogg":      ".ogg",
+	"audio/opus":     ".ogg",
+	"audio/aiff":     ".aiff",
+	"audio/x-aiff":   ".aiff",
+	"audio/webm":     ".webm",
+	"audio/aac":      ".aac",
+}
 
 // GetAudioDuration 使用纯 Go 库获取音频文件的时长（秒）。
 // 它不再依赖外部的 ffmpeg 或 ffprobe 程序。
@@ -46,6 +68,23 @@ func GetAudioDuration(ctx context.Context, f io.ReadSeeker, ext string) (duratio
 	}
 	SysLog(fmt.Sprintf("GetAudioDuration: duration=%f", duration))
 	return duration, err
+}
+
+func ResolveSupportedAudioExtension(audioURL, mimeType string) string {
+	if parsedURL, err := url.Parse(audioURL); err == nil {
+		if ext := strings.ToLower(filepath.Ext(parsedURL.Path)); ext != "" {
+			return ext
+		}
+	}
+
+	mimeType = strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
+	if mimeType == "" {
+		return ""
+	}
+	if ext, ok := audioMimeTypeToExtension[mimeType]; ok {
+		return ext
+	}
+	return ""
 }
 
 // getMP3Duration 解析 MP3 文件以获取时长。

@@ -8,6 +8,8 @@ const (
 	ContextKeyEstimatedTokens ContextKey = "estimated_tokens"
 
 	ContextKeyOriginalModel    ContextKey = "original_model"
+	ContextKeyUserTpm          ContextKey = "user_tpm"
+	ContextKeyEnableOssUpload  ContextKey = "enable_oss_upload"
 	ContextKeyRequestStartTime ContextKey = "request_start_time"
 
 	/* token related keys */

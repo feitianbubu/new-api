@@ -88,6 +88,9 @@ func VideoProxy(c *gin.Context) {
 	case constant.ChannelTypeGemini:
 		apiKey := task.PrivateData.Key
 		if apiKey == "" {
+			apiKey = channel.Key // 兼容不存库的数据
+		}
+		if apiKey == "" {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Missing stored API key for Gemini task %s", taskID))
 			videoProxyError(c, http.StatusInternalServerError, "server_error", "API key not stored for task")
 			return

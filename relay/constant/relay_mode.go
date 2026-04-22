@@ -51,6 +51,8 @@ const (
 
 	RelayModeGemini
 
+	RelayModeInteractions
+
 	RelayModeResponsesCompact
 )
 
@@ -86,6 +88,8 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeRerank
 	} else if strings.HasPrefix(path, "/v1/realtime") {
 		relayMode = RelayModeRealtime
+	} else if strings.HasPrefix(path, "/v1beta/interactions") {
+		relayMode = RelayModeInteractions
 	} else if strings.HasPrefix(path, "/v1beta/models") || strings.HasPrefix(path, "/v1/models") {
 		relayMode = RelayModeGemini
 	} else if strings.HasPrefix(path, "/mj") {
@@ -143,7 +147,7 @@ func Path2RelaySuno(method, path string) int {
 		relayMode = RelayModeSunoFetch
 	} else if method == http.MethodGet && strings.Contains(path, "/fetch/") {
 		relayMode = RelayModeSunoFetchByID
-	} else if strings.Contains(path, "/submit/") {
+	} else if strings.Contains(path, "/submit/") || strings.HasSuffix(path, "/api/v1/generate") {
 		relayMode = RelayModeSunoSubmit
 	}
 	return relayMode

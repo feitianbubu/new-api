@@ -203,7 +203,8 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		}
 	} else {
 		// 按量计费：以模型倍率的一半作为预扣额度
-		quota = int(modelRatio / 2 * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		// update: PreConsumedQuota 作为预扣额度（管理员可配置，设0则不预扣）
+		quota = int(float64(common.PreConsumedQuota) * groupRatioInfo.GroupRatio)
 		modelPrice = -1
 		if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
 			if groupRatioInfo.GroupRatio == 0 || modelRatio == 0 {

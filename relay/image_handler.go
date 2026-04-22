@@ -68,6 +68,21 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 				return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 			}
 
+			switch convertedRequest.(type) {
+			case dto.ImageRequest:
+				if mergedJson, err := mergeExtraBody(c, jsonData); err != nil {
+					logger.LogWarn(c, fmt.Sprintf("merge body fields failed: %v, use original json data", err))
+				} else {
+					jsonData = mergedJson
+				}
+			case *dto.GeminiChatRequest:
+				if mergedJson, err := mergeExtraBodyWithOverrides(c, jsonData, []string{"tools"}); err != nil {
+					logger.LogWarn(c, fmt.Sprintf("merge body fields failed: %v, use original json data", err))
+				} else {
+					jsonData = mergedJson
+				}
+			}
+
 			// apply param override
 			if len(info.ParamOverride) > 0 {
 				jsonData, err = relaycommon.ApplyParamOverrideWithRelayInfo(jsonData, info)
@@ -77,6 +92,7 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 			}
 
 			logger.LogDebug(c, "image request body: %s", jsonData)
+			common.SetChannelRequestBodyIfEnabled(c, jsonData)
 			body, size, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
 			if err != nil {
 				return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
@@ -113,6 +129,9 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 
 	usage, newAPIError := adaptor.DoResponse(c, httpResp, info)
 	if newAPIError != nil {
+		if usageDto, ok := usage.(*dto.Usage); ok && usageDto != nil {
+			service.PostTextConsumeQuota(c, info, usageDto, nil)
+		}
 		// reset status code 重置状态码
 		service.ResetStatusCode(newAPIError, statusCodeMappingStr)
 		return newAPIError
@@ -138,6 +157,11 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	}
 	if usage.(*dto.Usage).PromptTokens == 0 {
 		usage.(*dto.Usage).PromptTokens = 1
+	}
+	if usage.(*dto.Usage).CompletionTokens == 0 {
+		if model_setting.IsGeminiModelSupportImagine(info.OriginModelName) {
+			usage.(*dto.Usage).CompletionTokens = int(2000 * imageN)
+		}
 	}
 
 	quality := request.Quality

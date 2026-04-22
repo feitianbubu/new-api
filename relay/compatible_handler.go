@@ -159,6 +159,13 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 			return types.NewError(err, types.ErrorCodeJsonMarshalFailed, types.ErrOptionWithSkipRetry())
 		}
 
+		//if _, ok := convertedRequest.(*dto.GeneralOpenAIRequest); ok {
+		//	if mergedJson, err := mergeExtraBodyWithOverrides(c, jsonData, []string{"tools"}); err != nil {
+		//		logger.LogWarn(c, fmt.Sprintf("merge body fields failed: %v, use original json data", err))
+		//	} else {
+		//		jsonData = mergedJson
+		//	}
+		//}
 		// remove disabled fields for OpenAI API
 		jsonData, err = relaycommon.RemoveDisabledFields(jsonData, info.ChannelOtherSettings, info.ChannelSetting.PassThroughBodyEnabled)
 		if err != nil {
@@ -174,6 +181,7 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		}
 
 		logger.LogDebug(c, "text request body: %s", jsonData)
+		common.SetChannelRequestBodyIfEnabled(c, jsonData)
 
 		body, size, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
 		if err != nil {
@@ -206,6 +214,9 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 
 	usage, newApiErr := adaptor.DoResponse(c, httpResp, info)
 	if newApiErr != nil {
+		if usageDto, ok := usage.(*dto.Usage); ok && usageDto != nil {
+			service.PostTextConsumeQuota(c, info, usageDto, nil)
+		}
 		// reset status code 重置状态码
 		service.ResetStatusCode(newApiErr, statusCodeMappingStr)
 		return newApiErr
@@ -220,4 +231,44 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		service.PostTextConsumeQuota(c, info, usage.(*dto.Usage), nil)
 	}
 	return nil
+}
+
+func mergeExtraBody(c *gin.Context, jsonData []byte) ([]byte, error) {
+	return mergeExtraBodyWithOverrides(c, jsonData, nil)
+}
+
+func mergeExtraBodyWithOverrides(c *gin.Context, jsonData []byte, overridePaths []string) ([]byte, error) {
+	var converted map[string]any
+	if err := common.Unmarshal(jsonData, &converted); err != nil {
+		return nil, err
+	}
+	var original map[string]any
+	if err := common.UnmarshalBodyReusable(c, &original); err != nil {
+		return jsonData, err
+	}
+
+	for key, value := range original {
+		if _, exists := converted[key]; exists {
+			continue
+		}
+		if len(overridePaths) > 0 && !lo.Contains(overridePaths, key) {
+			continue
+		}
+		if info := c.Request; info != nil && strings.HasPrefix(info.URL.Path, "/pg/") && key == "group" {
+			continue
+		}
+		if strVal, ok := value.(string); ok {
+			trimmed := strings.TrimSpace(strVal)
+			if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
+				(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+				var decoded any
+				if err := common.Unmarshal([]byte(trimmed), &decoded); err == nil {
+					converted[key] = decoded
+					continue
+				}
+			}
+		}
+		converted[key] = value
+	}
+	return common.Marshal(converted)
 }

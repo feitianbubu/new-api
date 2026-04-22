@@ -95,6 +95,21 @@ func GetBodyStorage(c *gin.Context) (BodyStorage, error) {
 	return bs, nil
 }
 
+func GetRequestBodyBytes(c *gin.Context) ([]byte, error) {
+	storage, err := GetBodyStorage(c)
+	if err != nil || storage == nil {
+		return nil, err
+	}
+	data, err := storage.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := storage.Seek(0, io.SeekStart); err == nil {
+		c.Request.Body = io.NopCloser(ReaderOnly(storage))
+	}
+	return data, nil
+}
+
 // CleanupBodyStorage 清理请求体存储（应在请求结束时调用）
 func CleanupBodyStorage(c *gin.Context) {
 	if storage, exists := c.Get(KeyBodyStorage); exists && storage != nil {

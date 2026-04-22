@@ -94,6 +94,15 @@ func InitEnv() {
 		}
 	}
 
+	// OSS 日志配置
+	OSSLogEnabled = os.Getenv("OSS_LOG_ENABLED") == "true"
+	OSSLogBasePath = GetEnvOrDefaultString("OSS_LOG_BASE_PATH", "logs")
+	SqlLogEnabled = os.Getenv("SQL_LOG_ENABLED") == "true"
+	ResponseLogEnabled = os.Getenv("RESPONSE_LOG_ENABLED") == "true"
+	IsAutoMigrate = os.Getenv("AUTO_MIGRATE") == "true"
+	ChannelRequestBodyContextEnabled = GetEnvOrDefaultBool("CHANNEL_REQUEST_BODY_CONTEXT_ENABLED", false)
+	ChannelRequestBodyContextMaxBytes = int64(GetEnvOrDefault("CHANNEL_REQUEST_BODY_CONTEXT_MAX_BYTES", 1<<20))
+
 	// Parse requestInterval and set RequestInterval
 	requestInterval, _ = strconv.Atoi(os.Getenv("POLLING_INTERVAL"))
 	RequestInterval = time.Duration(requestInterval) * time.Second
@@ -112,15 +121,16 @@ func InitEnv() {
 
 	// Initialize rate limit variables
 	GlobalApiRateLimitEnable = GetEnvOrDefaultBool("GLOBAL_API_RATE_LIMIT_ENABLE", true)
-	GlobalApiRateLimitNum = GetEnvOrDefault("GLOBAL_API_RATE_LIMIT", 360)
-	GlobalApiRateLimitDuration = int64(GetEnvOrDefault("GLOBAL_API_RATE_LIMIT_DURATION", 180))
+	GlobalApiRateLimitNum = GetEnvOrDefault("GLOBAL_API_RATE_LIMIT", 180)
+	GlobalApiVideoRateLimitNum = GetEnvOrDefault("GLOBAL_API_VIDEO_RATE_LIMIT", GlobalApiRateLimitNum)
+	GlobalApiRateLimitDuration = int64(GetEnvOrDefault("GLOBAL_API_RATE_LIMIT_DURATION", 60))
 
 	GlobalWebRateLimitEnable = GetEnvOrDefaultBool("GLOBAL_WEB_RATE_LIMIT_ENABLE", true)
-	GlobalWebRateLimitNum = GetEnvOrDefault("GLOBAL_WEB_RATE_LIMIT", 120)
-	GlobalWebRateLimitDuration = int64(GetEnvOrDefault("GLOBAL_WEB_RATE_LIMIT_DURATION", 180))
+	GlobalWebRateLimitNum = GetEnvOrDefault("GLOBAL_WEB_RATE_LIMIT", 60)
+	GlobalWebRateLimitDuration = int64(GetEnvOrDefault("GLOBAL_WEB_RATE_LIMIT_DURATION", 60))
 
 	CriticalRateLimitEnable = GetEnvOrDefaultBool("CRITICAL_RATE_LIMIT_ENABLE", true)
-	CriticalRateLimitNum = GetEnvOrDefault("CRITICAL_RATE_LIMIT", 20)
+	CriticalRateLimitNum = GetEnvOrDefault("CRITICAL_RATE_LIMIT", 2000)
 	CriticalRateLimitDuration = int64(GetEnvOrDefault("CRITICAL_RATE_LIMIT_DURATION", 20*60))
 
 	SearchRateLimitEnable = GetEnvOrDefaultBool("SEARCH_RATE_LIMIT_ENABLE", true)
@@ -152,6 +162,8 @@ func initConstantEnv() {
 	constant.ErrorLogEnabled = GetEnvOrDefaultBool("ERROR_LOG_ENABLED", false)
 	// 任务轮询时查询的最大数量
 	constant.TaskQueryLimit = GetEnvOrDefault("TASK_QUERY_LIMIT", 1000)
+	// 未完成异步任务并发上限（0 表示不限制）
+	constant.TaskMaxConcurrentTask = GetEnvOrDefault("TASK_MAX_CONCURRENT_TASK", 0)
 	// 异步任务超时时间（分钟），超过此时间未完成的任务将被标记为失败并退款。0 表示禁用。
 	constant.TaskTimeoutMinutes = GetEnvOrDefault("TASK_TIMEOUT_MINUTES", 1440)
 

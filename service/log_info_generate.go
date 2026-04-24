@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -14,12 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func appendFullPath(ctx *gin.Context, path string) string {
+	return fmt.Sprintf("[%s]%s%s", common.GetIp(), ctx.Request.Host, path)
+}
+
 func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
 	if other == nil {
 		return
 	}
 	if ctx != nil && ctx.Request != nil && ctx.Request.URL != nil {
 		if path := ctx.Request.URL.Path; path != "" {
+			path = appendFullPath(ctx, path)
 			other["request_path"] = path
 			return
 		}
@@ -29,6 +35,7 @@ func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other
 		if idx := strings.Index(path, "?"); idx != -1 {
 			path = path[:idx]
 		}
+		path = appendFullPath(ctx, path)
 		other["request_path"] = path
 	}
 }

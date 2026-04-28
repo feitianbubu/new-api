@@ -91,7 +91,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 func TaskPollingLoop() {
 	for {
 		time.Sleep(time.Duration(15) * time.Second)
-		common.SysLog("任务进度轮询开始")
+		start := time.Now()
 		ctx := context.TODO()
 		sweepTimedOutTasks(ctx)
 		allTasks := model.GetAllUnFinishSyncTasks(constant.TaskQueryLimit)
@@ -133,7 +133,10 @@ func TaskPollingLoop() {
 
 			DispatchPlatformUpdate(platform, taskChannelM, taskM)
 		}
-		common.SysLog("任务进度轮询完成")
+		if len(allTasks) > 0 {
+			common.SysLog(fmt.Sprintf("task polling: fetched %d tasks in %d platforms, took %s",
+				len(allTasks), len(platformTask), time.Since(start)))
+		}
 	}
 }
 
@@ -192,7 +195,7 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 		return errors.New("adaptor not found")
 	}
 	proxy := ch.GetSetting().Proxy
-	resp, err := adaptor.FetchTask(*ch.BaseURL, ch.Key, map[string]any{
+	resp, err := adaptor.FetchTask(ch.GetBaseURL(), ch.Key, map[string]any{
 		"ids": taskIds,
 	}, proxy)
 	if err != nil {
@@ -238,6 +241,10 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 		}
 		if responseItem.Status == model.TaskStatusSuccess {
 			task.Progress = "100%"
+			if responseItem.Url != "" {
+				task.Url = responseItem.Url
+				task.PrivateData.ResultURL = responseItem.Url
+			}
 		}
 		task.Data = responseItem.Data
 
@@ -353,7 +360,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		logger.LogError(ctx, fmt.Sprintf("Task %s not found in taskM", taskId))
 		return fmt.Errorf("task %s not found", taskId)
 	}
-	key := ch.Key
+	key := ch.GetKey()
 
 	privateData := task.PrivateData
 	if privateData.Key != "" {
@@ -362,6 +369,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	resp, err := adaptor.FetchTask(baseURL, key, map[string]any{
 		"task_id": task.GetUpstreamTaskID(),
 		"action":  task.Action,
+		"req_key": task.Properties.UpstreamModelName,
 	}, proxy)
 	if err != nil {
 		return fmt.Errorf("fetchTask failed for task %s: %w", taskId, err)
@@ -449,6 +457,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 			// No URL from adaptor — construct proxy URL using public task ID
 			task.PrivateData.ResultURL = taskcommon.BuildProxyURL(task.TaskID)
 		}
+		applyVideoTaskResultURL(ctx, task, taskResult)
 		shouldSettle = true
 	case model.TaskStatusFailure:
 		logger.LogJson(ctx, fmt.Sprintf("Task %s failed", taskId), task)
@@ -481,6 +490,8 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 			logger.LogWarn(ctx, fmt.Sprintf("Task %s already transitioned by another process, skip billing", task.TaskID))
 			shouldRefund = false
 			shouldSettle = false
+		} else if task.Status == model.TaskStatusFailure {
+			recordTaskPollingErrorLog(ctx, ch, task)
 		}
 	} else if !snap.Equal(task.Snapshot()) {
 		if _, err := task.UpdateWithStatus(snap.Status); err != nil {
@@ -499,6 +510,51 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	}
 
 	return nil
+}
+
+func recordTaskPollingErrorLog(ctx context.Context, ch *model.Channel, task *model.Task) {
+	if !constant.ErrorLogEnabled || task == nil {
+		return
+	}
+
+	endTime := lo.Ternary(task.FinishTime > 0, task.FinishTime, time.Now().Unix())
+	useTimeSeconds := lo.Ternary(task.SubmitTime > 0 && endTime >= task.SubmitTime, int(endTime-task.SubmitTime), 0)
+
+	channelName := ""
+	channelType := 0
+	if ch != nil {
+		channelName = ch.Name
+		channelType = ch.Type
+	}
+	content := strings.TrimSpace(task.FailReason)
+	if content == "" {
+		content = "task polling failed"
+	}
+	other := map[string]interface{}{
+		"task_id":       task.TaskID,
+		"channel_id":    task.ChannelId,
+		"channel_name":  channelName,
+		"channel_type":  channelType,
+		"failure_stage": "task_polling",
+		"admin_info": map[string]interface{}{
+			"use_channel": []string{fmt.Sprintf("%d", task.ChannelId)},
+		},
+	}
+
+	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
+		UserId:     task.UserId,
+		LogType:    model.LogTypeError,
+		Content:    content,
+		ChannelId:  task.ChannelId,
+		ModelName:  taskModelName(task),
+		Quota:      0,
+		TokenId:    task.PrivateData.TokenId,
+		Group:      task.Group,
+		UseTime:    useTimeSeconds,
+		Properties: &task.Properties,
+		Other:      other,
+	})
+	logger.LogInfo(ctx, fmt.Sprintf("Recorded polling error log for task %s", task.TaskID))
 }
 
 func redactVideoResponseBody(body []byte) []byte {

@@ -131,6 +131,14 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 			}
 		}
 	}
+	modelName := taskModelName(task)
+	if _, ok := other["model_ratio"]; !ok {
+		other["model_ratio"], _, _ = ratio_setting.GetModelRatio(modelName)
+	}
+	if _, ok := other["group_ratio"]; !ok {
+		other["group_ratio"] = ratio_setting.GetGroupRatio(task.Group)
+	}
+	other["completion_ratio"] = ratio_setting.GetCompletionRatio(modelName)
 	props := task.Properties
 	if props.UpstreamModelName != "" && props.UpstreamModelName != props.OriginModelName {
 		other["is_model_mapped"] = true
@@ -169,15 +177,16 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	other["task_id"] = task.TaskID
 	other["reason"] = reason
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
-		UserId:    task.UserId,
-		LogType:   model.LogTypeRefund,
-		Content:   "",
-		ChannelId: task.ChannelId,
-		ModelName: taskModelName(task),
-		Quota:     quota,
-		TokenId:   task.PrivateData.TokenId,
-		Group:     task.Group,
-		Other:     other,
+		UserId:     task.UserId,
+		LogType:    model.LogTypeRefund,
+		Content:    "",
+		ChannelId:  task.ChannelId,
+		ModelName:  taskModelName(task),
+		Quota:      quota,
+		TokenId:    task.PrivateData.TokenId,
+		Group:      task.Group,
+		Properties: &task.Properties,
+		Other:      other,
 	})
 }
 
@@ -231,16 +240,24 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	other["task_id"] = task.TaskID
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
+	useTime := 0
+	if task.StartTime > 0 && task.FinishTime >= task.StartTime {
+		useTime = int(task.FinishTime - task.StartTime)
+	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
-		UserId:    task.UserId,
-		LogType:   logType,
-		Content:   reason,
-		ChannelId: task.ChannelId,
-		ModelName: taskModelName(task),
-		Quota:     logQuota,
-		TokenId:   task.PrivateData.TokenId,
-		Group:     task.Group,
-		Other:     other,
+		UserId:           task.UserId,
+		LogType:          logType,
+		Content:          reason,
+		ChannelId:        task.ChannelId,
+		ModelName:        taskModelName(task),
+		Quota:            logQuota,
+		PromptTokens:     task.PrivateData.BillingContext.PromptTokens,
+		CompletionTokens: task.PrivateData.BillingContext.CompletionTokens,
+		TokenId:          task.PrivateData.TokenId,
+		Group:            task.Group,
+		Properties:       &task.Properties,
+		UseTime:          useTime,
+		Other:            other,
 	})
 }
 
@@ -297,5 +314,8 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	actualQuota := int(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
 
 	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
+	if task.PrivateData.BillingContext.CompletionTokens == 0 {
+		task.PrivateData.BillingContext.CompletionTokens = totalTokens
+	}
 	RecalculateTaskQuota(ctx, task, actualQuota, reason)
 }

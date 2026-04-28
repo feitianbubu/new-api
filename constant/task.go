@@ -16,6 +16,7 @@ const (
 	TaskActionFirstTailGenerate = "firstTailGenerate"
 	TaskActionReferenceGenerate = "referenceGenerate"
 	TaskActionRemix             = "remixGenerate"
+	TaskActionMultiFrame        = "multiFrameGenerate" // vidu智能多帧
 )
 
 var SunoModel2Action = map[string]string{

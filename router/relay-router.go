@@ -71,6 +71,7 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.SystemPerformanceCheck())
 	relayV1Router.Use(middleware.TokenAuth())
 	relayV1Router.Use(middleware.ModelRequestRateLimit())
+	relayV1Router.Use(middleware.ModelTPMRateLimit())
 	{
 		// WebSocket 路由（统一到 Relay）
 		wsRouter := relayV1Router.Group("")
@@ -106,13 +107,14 @@ func SetRelayRouter(router *gin.Engine) {
 		})
 
 		// image related routes
-		httpRouter.POST("/edits", func(c *gin.Context) {
+		httpImageRouter := httpRouter.Group("").Use(middleware.ImageResponseMiddleware())
+		httpImageRouter.POST("/edits", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
-		httpRouter.POST("/images/generations", func(c *gin.Context) {
+		httpImageRouter.POST("/images/generations", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
-		httpRouter.POST("/images/edits", func(c *gin.Context) {
+		httpImageRouter.POST("/images/edits", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
 
@@ -152,11 +154,11 @@ func SetRelayRouter(router *gin.Engine) {
 
 		// not implemented
 		httpRouter.POST("/images/variations", controller.RelayNotImplemented)
-		httpRouter.GET("/files", controller.RelayNotImplemented)
-		httpRouter.POST("/files", controller.RelayNotImplemented)
-		httpRouter.DELETE("/files/:id", controller.RelayNotImplemented)
-		httpRouter.GET("/files/:id", controller.RelayNotImplemented)
-		httpRouter.GET("/files/:id/content", controller.RelayNotImplemented)
+		relayV1Router.POST("/files", controller.Upload)
+		relayV1Router.GET("/files", controller.ListFiles)
+		relayV1Router.GET("/files/:file_id", controller.GetFileInfo)
+		relayV1Router.DELETE("/files/:file_id", controller.DeleteFile)
+		router.Match([]string{"GET", "HEAD"}, "v1/files/:file_id/content", middleware.HeadMethodHandler(), controller.GetFileContent)
 		httpRouter.POST("/fine-tunes", controller.RelayNotImplemented)
 		httpRouter.GET("/fine-tunes", controller.RelayNotImplemented)
 		httpRouter.GET("/fine-tunes/:id", controller.RelayNotImplemented)
@@ -184,6 +186,8 @@ func SetRelayRouter(router *gin.Engine) {
 		relaySunoRouter.POST("/submit/:action", controller.RelayTask)
 		relaySunoRouter.POST("/fetch", controller.RelayTaskFetch)
 		relaySunoRouter.GET("/fetch/:id", controller.RelayTaskFetch)
+
+		relaySunoRouter.POST("/api/v1/generate", controller.RelayTask)
 	}
 
 	relayGeminiRouter := router.Group("/v1beta")
@@ -191,9 +195,16 @@ func SetRelayRouter(router *gin.Engine) {
 	relayGeminiRouter.Use(middleware.SystemPerformanceCheck())
 	relayGeminiRouter.Use(middleware.TokenAuth())
 	relayGeminiRouter.Use(middleware.ModelRequestRateLimit())
+	relayGeminiRouter.Use(middleware.ModelTPMRateLimit())
 	relayGeminiRouter.Use(middleware.Distribute())
 	{
 		// Gemini API 路径格式: /v1beta/models/{model_name}:{action}
+		relayGeminiRouter.POST("/interactions", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatInteractions)
+		})
+		relayGeminiRouter.GET("/interactions/:interaction_id", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatInteractions)
+		})
 		relayGeminiRouter.POST("/models/*path", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatGemini)
 		})

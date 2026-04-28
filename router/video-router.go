@@ -27,7 +27,7 @@ func SetVideoRouter(router *gin.Engine) {
 	// openai compatible API video routes
 	// docs: https://platform.openai.com/docs/api-reference/videos/create
 	{
-		videoV1Router.POST("/videos", controller.RelayTask)
+		videoV1Router.POST("/videos", middleware.GlobalAPIVideoRateLimit(), middleware.TaskConcurrencyLimit(), controller.RelayTask)
 		videoV1Router.GET("/videos/:task_id", controller.RelayTaskFetch)
 	}
 
@@ -48,5 +48,21 @@ func SetVideoRouter(router *gin.Engine) {
 	{
 		// Maps to: /?Action=CVSync2AsyncSubmitTask&Version=2022-08-31 and /?Action=CVSync2AsyncGetResult&Version=2022-08-31
 		jimengOfficialGroup.POST("/", controller.RelayTask)
+	}
+
+	// Doubao Asset API routes - proxy to volcengine Asset API with AK/SK auth
+	doubaoGroup := router.Group("/doubao")
+	doubaoGroup.Use(middleware.RouteTag("relay"))
+	doubaoGroup.Use(middleware.TokenAuth())
+	{
+		doubaoGroup.POST("/open/ListAssets", controller.RelayListAssets)
+		doubaoGroup.POST("/open/GetAsset", controller.RelayGetAsset)
+		doubaoGroup.POST("/open/CreateAsset", controller.RelayCreateAsset)
+		doubaoGroup.POST("/open/UpdateAsset", controller.RelayUpdateAsset)
+		doubaoGroup.POST("/open/DeleteAsset", controller.RelayDeleteAsset)
+		doubaoGroup.POST("/open/CreateAssetGroup", controller.RelayCreateAssetGroup)
+		doubaoGroup.POST("/open/ListAssetGroups", controller.RelayListAssetGroups)
+		doubaoGroup.POST("/open/GetAssetGroup", controller.RelayGetAssetGroup)
+		doubaoGroup.POST("/open/UpdateAssetGroup", controller.RelayUpdateAssetGroup)
 	}
 }

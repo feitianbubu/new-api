@@ -59,6 +59,8 @@ import {
   getFirstResponseTimeColor,
   getResponseTimeColor,
 } from '../../lib/format'
+import { useOSSPreview } from '../../hooks/use-oss-preview'
+import { OSSPreviewModal } from './oss-preview-modal'
 import {
   getLogTypeConfig,
   isPerCallBilling,
@@ -401,6 +403,7 @@ interface DetailsDialogProps {
 export function DetailsDialog(props: DetailsDialogProps) {
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
+  const ossPreview = useOSSPreview()
   const details = props.log.content ?? ''
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
@@ -515,7 +518,24 @@ export function DetailsDialog(props: DetailsDialogProps) {
               {props.log.request_id && (
                 <DetailRow
                   label={t('Request ID')}
-                  value={props.log.request_id}
+                  value={
+                    ossPreview.hasOSSFiles(props.log.request_id) ? (
+                      <button
+                        type='button'
+                        className='text-primary hover:underline'
+                        onClick={() =>
+                          ossPreview.openPreview(
+                            props.log.request_id,
+                            t('Content')
+                          )
+                        }
+                      >
+                        {props.log.request_id}
+                      </button>
+                    ) : (
+                      props.log.request_id
+                    )
+                  }
                   mono
                 />
               )}
@@ -553,6 +573,22 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 <DetailRow
                   label={t('Token')}
                   value={props.log.token_name}
+                  mono
+                />
+              )}
+
+              {other?.client_id && (
+                <DetailRow
+                  label={t('Client ID')}
+                  value={other.client_id}
+                  mono
+                />
+              )}
+
+              {props.isAdmin && other?.instance && (
+                <DetailRow
+                  label={t('Instance')}
+                  value={other.instance}
                   mono
                 />
               )}
@@ -1042,6 +1078,12 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </div>
         </ScrollArea>
       </DialogContent>
+      <OSSPreviewModal
+        open={ossPreview.open}
+        onOpenChange={ossPreview.setOpen}
+        requestId={ossPreview.requestId}
+        title={ossPreview.title}
+      />
     </Dialog>
   )
 }

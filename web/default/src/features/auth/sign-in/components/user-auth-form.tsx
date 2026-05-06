@@ -48,6 +48,7 @@ import { Turnstile } from '@/components/turnstile'
 import { login, wechatLoginByCode } from '@/features/auth/api'
 import { LegalConsent } from '@/features/auth/components/legal-consent'
 import { OAuthProviders } from '@/features/auth/components/oauth-providers'
+import { WeChatDirectQrDialog } from './wechat-direct-qr-dialog'
 import { loginFormSchema } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
 import { useTurnstile } from '@/features/auth/hooks/use-turnstile'
@@ -105,6 +106,11 @@ export function UserAuthForm({
   )
   const hasAlternativeLogin =
     passkeyLoginEnabled || hasWeChatLogin || hasOAuthLogin
+  const wechatDirectLoginEnabled = Boolean(
+    status?.wechat_direct_login_enabled ??
+      (status?.data as { wechat_direct_login_enabled?: boolean } | undefined)
+        ?.wechat_direct_login_enabled
+  )
 
   useEffect(() => {
     if (requiresLegalConsent) {
@@ -204,6 +210,30 @@ export function UserAuthForm({
         await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
         toast.success(t('Signed in via WeChat'))
         handleWeChatDialogChange(false)
+      } else {
+        toast.error(res?.message || loginFailedMessage)
+      }
+    } catch (_error) {
+      toast.error(loginFailedMessage)
+    } finally {
+      setIsWeChatSubmitting(false)
+    }
+  }
+
+  async function handleWeChatDirectAuthCode(authCode: string) {
+    setIsWeChatSubmitting(true)
+    try {
+      const res = await wechatLoginByCode(authCode)
+      const oauthCallback = (res as unknown as { oauth_callback?: string })
+        ?.oauth_callback
+      if (oauthCallback) {
+        window.location.href = oauthCallback
+        return
+      }
+      if (res?.success) {
+        await handleLoginSuccess(res.data as { id?: number } | null, redirectTo)
+        toast.success(t('Signed in via WeChat'))
+        setIsWeChatDialogOpen(false)
       } else {
         toast.error(res?.message || loginFailedMessage)
       }
@@ -403,7 +433,15 @@ export function UserAuthForm({
         {!hasAlternativeLogin && alternativeLoginMethods}
       </form>
 
-      {hasWeChatLogin && (
+      {hasWeChatLogin && wechatDirectLoginEnabled && (
+        <WeChatDirectQrDialog
+          open={isWeChatDialogOpen}
+          onOpenChange={handleWeChatDialogChange}
+          onAuthCode={handleWeChatDirectAuthCode}
+        />
+      )}
+
+      {hasWeChatLogin && !wechatDirectLoginEnabled && (
         <Dialog
           open={isWeChatDialogOpen}
           onOpenChange={handleWeChatDialogChange}

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/samber/lo"
 	"gorm.io/gorm"
 )
 
@@ -35,9 +36,11 @@ type Log struct {
 	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2"`
 	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1"`
 	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_created_at_type"`
-	Type              int    `json:"type" gorm:"index:idx_created_at_type"`
+	Type              int    `json:"type" gorm:"index:idx_created_at_type;index:idx_type"`
 	Content           string `json:"content"`
 	Username          string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
+	DisplayName       string `json:"display_name" gorm:"-"`
+	Instance          string `json:"instance" gorm:"index;type:varchar(128);default:''"`
 	TokenName         string `json:"token_name" gorm:"index;default:''"`
 	ModelName         string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
 	Quota             int    `json:"quota" gorm:"default:0"`
@@ -65,6 +68,7 @@ const (
 	LogTypeError   = 5
 	LogTypeRefund  = 6
 	LogTypeLogin   = 7
+	LogTypeLogout  = 12
 )
 
 func formatUserLogs(logs []*Log, startIdx int) {
@@ -91,6 +95,29 @@ func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
 	return logs, err
 }
 
+func RecordDetailLog(c *gin.Context, userId int, logType int, content string, other map[string]interface{}) {
+	if logType == LogTypeConsume && !common.LogConsumeEnabled {
+		return
+	}
+	if other == nil {
+		other = make(map[string]interface{})
+	}
+	username, _ := GetUsernameById(userId, false)
+	otherStr := common.MapToJsonStr(other)
+	log := &Log{
+		UserId:    userId,
+		Username:  username,
+		CreatedAt: common.GetTimestamp(),
+		Type:      logType,
+		Content:   content,
+		Other:     otherStr,
+	}
+	err := createLog(c, log)
+	if err != nil {
+		common.SysError("failed to record detail log: " + err.Error())
+	}
+}
+
 func RecordLog(userId int, logType int, content string) {
 	if logType == LogTypeConsume && !common.LogConsumeEnabled {
 		return
@@ -103,7 +130,7 @@ func RecordLog(userId int, logType int, content string) {
 		Type:      logType,
 		Content:   content,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLogWithMetrics(context.Background(), log)
 	if err != nil {
 		common.SysLog("failed to record log: " + err.Error())
 	}
@@ -269,7 +296,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(c, log)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
@@ -332,7 +359,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := LOG_DB.Create(log).Error
+	err := createLog(c, log)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
@@ -344,15 +371,19 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 }
 
 type RecordTaskBillingLogParams struct {
-	UserId    int
-	LogType   int
-	Content   string
-	ChannelId int
-	ModelName string
-	Quota     int
-	TokenId   int
-	Group     string
-	Other     map[string]interface{}
+	UserId           int
+	LogType          int
+	Content          string
+	ChannelId        int
+	ModelName        string
+	Quota            int
+	PromptTokens     int
+	CompletionTokens int
+	TokenId          int
+	Group            string
+	UseTime          int
+	Properties       *Properties
+	Other            map[string]interface{}
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -365,28 +396,45 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		if token, err := GetTokenById(params.TokenId); err == nil {
 			tokenName = token.Name
 		}
+	} else if params.Properties != nil && params.Properties.TokenName != "" {
+		tokenName = params.Properties.TokenName
 	}
 	log := &Log{
-		UserId:    params.UserId,
-		Username:  username,
-		CreatedAt: common.GetTimestamp(),
-		Type:      params.LogType,
-		Content:   params.Content,
-		TokenName: tokenName,
-		ModelName: params.ModelName,
-		Quota:     params.Quota,
-		ChannelId: params.ChannelId,
-		TokenId:   params.TokenId,
-		Group:     params.Group,
-		Other:     common.MapToJsonStr(params.Other),
+		UserId:           params.UserId,
+		Username:         username,
+		CreatedAt:        common.GetTimestamp(),
+		Type:             params.LogType,
+		Content:          params.Content,
+		TokenName:        tokenName,
+		ModelName:        params.ModelName,
+		Quota:            params.Quota,
+		PromptTokens:     params.PromptTokens,
+		CompletionTokens: params.CompletionTokens,
+		ChannelId:        params.ChannelId,
+		TokenId:          params.TokenId,
+		Group:            params.Group,
+		UseTime:          params.UseTime,
+		Other:            common.MapToJsonStr(params.Other),
 	}
-	err := LOG_DB.Create(log).Error
+	if params.Properties != nil {
+		buildLogMetaFromProperties(context.Background(), log, params.Properties)
+	}
+	err := createLogWithMetrics(context.Background(), log)
 	if err != nil {
 		common.SysLog("failed to record task billing log: " + err.Error())
 	}
+	if common.DataExportEnabled {
+		quota := params.Quota
+		if params.LogType == LogTypeRefund {
+			quota = -quota
+		}
+		gopool.Go(func() {
+			LogQuotaData(log.UserId, username, log.ModelName, quota, common.GetTimestamp(), log.PromptTokens+log.CompletionTokens)
+		})
+	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string, upstreamRequestId string, instance string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -421,6 +469,13 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if group != "" {
 		tx = tx.Where("logs."+logGroupCol+" = ?", group)
 	}
+	if instance != "" {
+		instancePattern, err := sanitizeLikePattern(instance)
+		if err != nil {
+			return nil, 0, err
+		}
+		tx = tx.Where("logs.instance LIKE ? ESCAPE '!'", instancePattern)
+	}
 	err = tx.Model(&Log{}).Count(&total).Error
 	if err != nil {
 		return nil, 0, err
@@ -429,6 +484,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if err != nil {
 		return nil, 0, err
 	}
+	tryFetchDisplayName(logs)
 
 	channelIds := types.NewSet[int]()
 	for _, log := range logs {
@@ -516,7 +572,66 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 
 	formatUserLogs(logs, startIdx)
+
+	channelIds := types.NewSet[int]()
+	for _, log := range logs {
+		if log.ChannelId != 0 {
+			channelIds.Add(log.ChannelId)
+		}
+	}
+	if channelIds.Len() > 0 {
+		var channels []struct {
+			Id   int    `gorm:"column:id"`
+			Name string `gorm:"column:name"`
+		}
+		if err = DB.Table("channels").Select("id, name").Where("id IN ?", channelIds.Items()).Find(&channels).Error; err != nil {
+			return logs, total, err
+		}
+		channelMap := make(map[int]string, len(channels))
+		for _, channel := range channels {
+			channelMap[channel.Id] = channel.Name
+		}
+		for i := range logs {
+			logs[i].ChannelName = channelMap[logs[i].ChannelId]
+		}
+	}
+
 	return logs, total, err
+}
+
+func SearchAllLogs(keyword string) (logs []*Log, err error) {
+	err = LOG_DB.Where("type = ? or content LIKE ?", keyword, keyword+"%").Order("id desc").Limit(common.MaxRecentItems).Find(&logs).Error
+	tryFetchDisplayName(logs)
+	return logs, err
+}
+
+//func SearchUserLogs(userId int, keyword string) (logs []*Log, err error) {
+//	err = LOG_DB.Where("user_id = ? and type = ?", userId, keyword).Order("id desc").Limit(common.MaxRecentItems).Find(&logs).Error
+//	formatUserLogs(logs)
+//	return
+//}
+
+func tryFetchDisplayName(logs []*Log) {
+	if len(logs) == 0 {
+		return
+	}
+	userIds := lo.Uniq(lo.Map(logs, func(log *Log, _ int) int {
+		return log.UserId
+	}))
+	var users []*User
+	if err := DB.Where("id in ?", userIds).Select("id, display_name").Find(&users).Error; err != nil {
+		return
+	}
+	userMap := make(map[int]string, len(users))
+	for _, user := range users {
+		userMap[user.Id] = user.DisplayName
+	}
+	for _, log := range logs {
+		if displayName, ok := userMap[log.UserId]; ok {
+			log.DisplayName = displayName
+		}
+	}
+	return
 }
 
 type Stat struct {
@@ -623,4 +738,45 @@ func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64,
 	}
 
 	return total, nil
+}
+
+func RecordReConsumeLog(task *Task, modelRatio float64, groupRatio float64, completionRatio float64, completionTokens int, totalTokens int, preConsumedQuota int, actualQuota int, content string) {
+	username, _ := GetUsernameById(task.UserId, false)
+	quotaDelta := actualQuota - preConsumedQuota
+	promptTokens := totalTokens - completionTokens
+	useTimeSeconds := lo.Ternary(task.SubmitTime > 0, int(time.Now().Unix()-task.SubmitTime), 0)
+	other := map[string]interface{}{
+		"task_id":          task.TaskID,
+		"model_ratio":      modelRatio,
+		"group_ratio":      groupRatio,
+		"completion_ratio": completionRatio,
+		"total_tokens":     totalTokens,
+		"pre_consumed":     preConsumedQuota,
+		"actual_quota":     actualQuota,
+		"quota_delta":      quotaDelta,
+	}
+	log := &Log{
+		UserId:           task.UserId,
+		Username:         username,
+		CreatedAt:        common.GetTimestamp(),
+		Type:             LogTypeConsume,
+		Content:          content,
+		TokenName:        task.Properties.TokenName,
+		ModelName:        task.Properties.UpstreamModelName,
+		Quota:            quotaDelta,
+		PromptTokens:     promptTokens,
+		CompletionTokens: completionTokens,
+		UseTime:          useTimeSeconds,
+		ChannelId:        task.ChannelId,
+		TokenId:          task.Properties.TokenId,
+		Group:            task.Group,
+		Other:            common.MapToJsonStr(other),
+	}
+	buildLogMetaFromProperties(context.Background(), log, &task.Properties)
+	createLogWithMetrics(context.Background(), log)
+	if common.DataExportEnabled {
+		gopool.Go(func() {
+			LogQuotaData(log.UserId, username, log.ModelName, log.Quota, common.GetTimestamp(), log.PromptTokens+log.CompletionTokens)
+		})
+	}
 }

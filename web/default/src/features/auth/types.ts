@@ -110,6 +110,7 @@ export interface SystemStatus {
     wechat_qr_code_image_url?: string
     wechat_account_qrcode_image_url?: string
     WeChatAccountQRCodeImageURL?: string
+    wechat_direct_login_enabled?: boolean
     turnstile_check?: boolean
     turnstile_site_key?: string
     email_verification?: boolean

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/storage"
 	"gorm.io/gorm"
 )
 
@@ -23,6 +24,7 @@ func GetRankingQuotaTotals(startTime int64, endTime int64) ([]RankingQuotaTotal,
 	query := DB.Table("quota_data").
 		Select("model_name, sum(token_used) as total_tokens").
 		Where("model_name <> ''").
+		Where("model_name <> ?", storage.TOSStorage).
 		Group("model_name").
 		Having("sum(token_used) > 0").
 		Order("total_tokens DESC")
@@ -40,6 +42,7 @@ func GetRankingQuotaBuckets(startTime int64, endTime int64, bucketSize int64) ([
 	query := DB.Table("quota_data").
 		Select(fmt.Sprintf("model_name, %s as bucket, sum(token_used) as tokens", bucketExpr)).
 		Where("model_name <> ''").
+		Where("model_name <> ?", storage.TOSStorage).
 		Group(fmt.Sprintf("model_name, %s", bucketExpr)).
 		Having("sum(token_used) > 0").
 		Order("bucket ASC")

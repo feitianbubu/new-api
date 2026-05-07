@@ -21,6 +21,7 @@ import { ChevronRight, Copy } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
+import { formatTimestampToDate } from '@/lib/format'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { StatusBadge } from '@/components/status-badge'
 import { DEFAULT_TOKEN_UNIT } from '../constants'
@@ -75,7 +76,8 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     : null
 
   const primaryGroup = groups[0]
-  const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)]
+  const createdDate = props.model.created_time && props.model.created_time > 0 ? formatTimestampToDate(props.model.created_time).slice(0, 10) : null
+  const bottomTags = [createdDate, ...endpoints.slice(0, 2), ...tags.slice(0, 2),].filter((item): item is string => Boolean(item))
   const hiddenCount =
     Math.max(groups.length - 1, 0) +
     Math.max(endpoints.length - 2, 0) +

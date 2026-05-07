@@ -96,7 +96,7 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // About
   if (modules?.about !== false) {
-    links.push({ title: t('About'), href: '/about' })
+    links.push({ title: t('Status'), href: 'https://status.example.com', external: true, })
   }
 
   return links

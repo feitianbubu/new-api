@@ -57,6 +57,7 @@ export const userSchema = z.object({
   last_login_at: z.number().optional(),
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
+  tpm: z.number().optional(),
 })
 export type User = z.infer<typeof userSchema>
 

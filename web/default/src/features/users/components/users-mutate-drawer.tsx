@@ -397,6 +397,29 @@ export function UsersMutateDrawer({
 
                   <FormField
                     control={form.control}
+                    name='tpm'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('TPM Limit (per minute)')}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={0}
+                            value={field.value ?? 0}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value, 10) || 0)
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name='remark'
                     render={({ field }) => (
                       <FormItem>

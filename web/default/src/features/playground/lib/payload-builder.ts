@@ -44,11 +44,14 @@ export function buildChatCompletionPayload(
     stream: config.stream,
   }
 
+  if (parameterEnabled.max_tokens && Number(config.max_tokens) > 0) {
+    payload.max_tokens = parseInt(String(config.max_tokens), 10)
+  }
+
   // Add enabled parameters
   const parameterKeys: Array<keyof ParameterEnabled> = [
     'temperature',
     'top_p',
-    'max_tokens',
     'frequency_penalty',
     'presence_penalty',
     'seed',

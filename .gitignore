@@ -18,6 +18,8 @@ new-api
 /__debug_bin*
 .DS_Store
 tiktoken_cache
+/docker/volumes/
+VERSION
 .eslintcache
 .gocache
 .gomodcache/

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
-import { CircleAlert, Sparkles, KeyRound } from 'lucide-react'
+import { CircleAlert, Eye, Sparkles, KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
@@ -56,6 +56,8 @@ import {
 } from '../../lib/utils'
 import type { LogOtherData } from '../../types'
 import { DetailsDialog } from '../dialogs/details-dialog'
+import { OSSPreviewModal } from '../dialogs/oss-preview-modal'
+import { useOSSPreview } from '../../hooks/use-oss-preview'
 import { ModelBadge } from '../model-badge'
 import { useUsageLogsContext } from '../usage-logs-provider'
 
@@ -752,18 +754,34 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       header: t('Details'),
       cell: function DetailsCell({ row }) {
         const [dialogOpen, setDialogOpen] = useState(false)
+        const ossPreview = useOSSPreview()
         const log = row.original
         const other = parseLogOther(log.other)
 
         const segments = buildDetailSegments(log, other, t)
         const primary = segments[0]
         const hasMore = segments.length > 1
+        const hasOss =
+          !!log.request_id && ossPreview.hasOSSFiles(log.request_id)
 
         return (
           <>
+            {hasOss && (
+              <button
+                type='button'
+                onClick={(e) => {
+                  e.stopPropagation()
+                  ossPreview.openPreview(log.request_id, t('Content'))
+                }}
+                className='text-muted-foreground hover:text-primary mr-1 inline-flex shrink-0 align-middle'
+                title={t('OSS Preview')}
+              >
+                <Eye className='size-3.5' />
+              </button>
+            )}
             <button
               type='button'
-              className='group flex max-w-[200px] items-center gap-1 text-left text-xs'
+              className='group inline-flex max-w-[200px] items-center gap-1 text-left text-xs align-middle'
               onClick={() => setDialogOpen(true)}
               title={t('Click to view full details')}
             >
@@ -799,6 +817,14 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
               open={dialogOpen}
               onOpenChange={setDialogOpen}
             />
+            {hasOss && (
+              <OSSPreviewModal
+                open={ossPreview.open}
+                onOpenChange={ossPreview.setOpen}
+                requestId={ossPreview.requestId}
+                title={ossPreview.title}
+              />
+            )}
           </>
         )
       },

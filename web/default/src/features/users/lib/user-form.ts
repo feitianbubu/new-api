@@ -33,6 +33,7 @@ export const userFormSchema = z.object({
   quota_dollars: z.number().min(0).optional(),
   group: z.string().optional(),
   remark: z.string().optional(),
+  tpm: z.number().min(0).optional(),
 })
 
 export type UserFormValues = z.infer<typeof userFormSchema>
@@ -49,6 +50,7 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   quota_dollars: 0,
   group: DEFAULT_GROUP,
   remark: '',
+  tpm: 0,
 }
 
 // ============================================================================
@@ -78,6 +80,8 @@ export function transformFormDataToPayload(
     payload.id = userId
   }
 
+  ;(payload as unknown as { tpm: number }).tpm = parseInt(String(data.tpm ?? 0), 10) || 0
+
   return payload
 }
 
@@ -93,5 +97,6 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     quota_dollars: quotaUnitsToDollars(user.quota),
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
+    tpm: user.tpm ?? 0,
   }
 }

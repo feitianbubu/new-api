@@ -41,7 +41,9 @@ export async function sendChatCompletion(
  * Get user available models
  */
 export async function getUserModels(): Promise<ModelOption[]> {
-  const res = await api.get(API_ENDPOINTS.USER_MODELS)
+  const res = await api.get(API_ENDPOINTS.USER_MODELS, {
+    params: { tag: 'chat' },
+  })
   const { data } = res
 
   if (!data.success || !Array.isArray(data.data)) {

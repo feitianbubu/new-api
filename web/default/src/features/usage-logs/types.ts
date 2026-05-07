@@ -180,6 +180,10 @@ export interface LogOtherData {
   is_task?: boolean
   task_id?: string
   reason?: string
+  // Client identifier (e.g. SDK client app ID)
+  client_id?: string
+  // Backend instance label (admin only)
+  instance?: string
   // Subscription billing fields
   subscription_plan_id?: string
   subscription_plan_title?: string

@@ -1,5 +1,13 @@
 .github
 .git
+.idea/
+.cursor/
+docker/
+bin/
+vendor/
+scripts/
+logs/
+docker-compose.yml
 *.md
 .vscode
 .gitignore
@@ -12,4 +20,10 @@ docs
 /web/default/dist
 /web/classic/node_modules
 /web/classic/dist
+
+# Test and temp files
+test/
+*.db
+*.db-journal
+electron/
 !THIRD-PARTY-LICENSES.md

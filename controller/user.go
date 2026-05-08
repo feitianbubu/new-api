@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/samber/lo"
 
 	"github.com/QuantumNous/new-api/constant"
 
@@ -25,11 +26,92 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+// handleOAuthCallback 处理OAuth回调逻辑
+func handleOAuthCallback(user *model.User, session sessions.Session, c *gin.Context) {
+	var pendingData map[string]interface{}
+	oauthPending := session.Get("oauth_pending")
+	if err := json.Unmarshal([]byte(oauthPending.(string)), &pendingData); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "OAuth pending信息解析失败: " + err.Error(),
+			"success": false,
+		})
+		return
+	}
+
+	clientID := pendingData["client_id"].(string)
+	redirectURI := pendingData["redirect_uri"].(string)
+	scope := pendingData["scope"].(string)
+	state := pendingData["state"].(string)
+	nonce := pendingData["nonce"].(string)
+
+	// 清除OAuth pending信息
+	session.Delete("oauth_pending")
+	if err := session.Save(); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "保存会话信息失败: " + err.Error(),
+			"success": false,
+		})
+		return
+	}
+
+	// 生成授权码
+	authCode, err := model.GenerateOIDCAuthorizationCode(int64(user.Id), clientID, redirectURI, scope, nonce)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "OAuth授权失败: " + err.Error(),
+			"success": false,
+		})
+		return
+	}
+
+	// 构造回调URL
+	callbackURL, _ := url.Parse(redirectURI)
+	params := callbackURL.Query()
+	params.Set("code", authCode)
+	if state != "" {
+		params.Set("state", state)
+	}
+	callbackURL.RawQuery = params.Encode()
+
+	// 检查是否是AJAX请求
+	if c.GetHeader("X-Requested-With") == "XMLHttpRequest" ||
+		strings.Contains(c.GetHeader("Accept"), "application/json") {
+		// AJAX请求，返回JSON让前端处理重定向
+		cleanUser := model.User{
+			Id:          user.Id,
+			Username:    user.Username,
+			DisplayName: user.DisplayName,
+			Role:        user.Role,
+			Status:      user.Status,
+			Group:       user.Group,
+			Setting:     user.Setting,
+			AccessToken: user.AccessToken,
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"message":        "",
+			"success":        true,
+			"data":           cleanUser,
+			"oauth_callback": callbackURL.String(),
+		})
+	} else {
+		// 直接重定向
+		c.Redirect(http.StatusFound, callbackURL.String())
+	}
 }
 
+type LoginRequest struct {
+	Username string `json:"username" example:"test1"`
+	Password string `json:"password" example:"12345678"`
+}
+
+// Login
+// @Summary 普通登录
+// @Description 通过用户名和密码进行用户登录
+// @Tags User
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "登录请求参数"
+// @Router /api/user/login [post]
 func Login(c *gin.Context) {
 	if !common.PasswordLoginEnabled {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordLoginDisabled)
@@ -95,6 +177,13 @@ func setupLogin(user *model.User, c *gin.Context) {
 	if _, exists := c.Get("token_ttl"); !exists {
 		c.Set("token_ttl", c.DefaultQuery("token_ttl", common.LoginTokenTTLStr))
 	}
+	if err := model.GenerateAccessToken(c, user); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": err.Error(),
+			"success": false,
+		})
+		return
+	}
 	model.UpdateUserLastLoginAt(user.Id)
 	session := sessions.Default(c)
 	session.Set("id", user.Id)
@@ -107,23 +196,61 @@ func setupLogin(user *model.User, c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserSessionSaveFailed)
 		return
 	}
+	var refreshToken string
+	if refreshToken, err = model.CreateRefreshToken(user); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "生成RefreshToken失败: " + err.Error(),
+			"success": false,
+		})
+		return
+	}
+
+	cleanUser := model.User{
+		Id:          user.Id,
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		Role:        user.Role,
+		Status:      user.Status,
+		Group:       user.Group,
+		Setting:     user.Setting,
+		ApiKey:      user.ApiKey,
+		AccessToken: user.AccessToken,
+	}
+	cleanUser.RefreshToken = refreshToken
+
+	// 检查是否有待处理的OAuth授权
+	if oauthPending := session.Get("oauth_pending"); oauthPending != nil {
+		handleOAuthCallback(user, session, c)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
-		"data": map[string]any{
-			"id":           user.Id,
-			"username":     user.Username,
-			"display_name": user.DisplayName,
-			"role":         user.Role,
-			"status":       user.Status,
-			"group":        user.Group,
-		},
+		"data":    cleanUser,
 	})
 }
 
+// Logout OIDC RP-Initiated Logout + 本地登出
+// @Summary 退出登录
+// @Description OIDC RP-Initiated Logout 端点（由 discovery 中 end_session_endpoint 暴露）；支持 post_logout_redirect_uri，且会在重定向时回传 state 参数。
+// @Tags OIDC
+// @Accept json
+// @Produce json
+// @Param post_logout_redirect_uri query string false "登出后重定向地址（必须为绝对 URL）"
+// @Param state query string false "可选透传状态值，将追加到 post_logout_redirect_uri 的查询参数中"
+// @Success 302 {string} string "Redirect to post_logout_redirect_uri"
+// @Success 200 {object} map[string]interface{} "Logout success"
+// @Failure 200 {object} map[string]interface{} "Invalid post_logout_redirect_uri"
+// @Router /api/user/logout [get]
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	// 保留 oauth_pending 数据，避免第三方 OAuth 授权流程中断
+	oauthPending := session.Get("oauth_pending")
 	session.Clear()
+	if oauthPending != nil {
+		session.Set("oauth_pending", oauthPending)
+	}
 	err := session.Save()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -132,6 +259,26 @@ func Logout(c *gin.Context) {
 		})
 		return
 	}
+
+	if postLogoutRedirectURI := strings.TrimSpace(c.Query("post_logout_redirect_uri")); postLogoutRedirectURI != "" {
+		state := strings.TrimSpace(c.Query("state"))
+		redirectURL, parseErr := url.Parse(postLogoutRedirectURI)
+		if parseErr != nil || redirectURL.Scheme == "" || redirectURL.Host == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "invalid post_logout_redirect_uri",
+				"success": false,
+			})
+			return
+		}
+		if state != "" {
+			queryParams := redirectURL.Query()
+			queryParams.Set("state", state)
+			redirectURL.RawQuery = queryParams.Encode()
+		}
+		c.Redirect(http.StatusFound, redirectURL.String())
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
@@ -315,24 +462,24 @@ func GenerateAccessToken(c *gin.Context) {
 		return
 	}
 	// get rand int 28-32
-	randI := common.GetRandomInt(4)
-	key, err := common.GenerateRandomKey(29 + randI)
+	//randI := common.GetRandomInt(4)
+	err = model.GenerateAccessToken(c, user)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgGenerateFailed)
 		common.SysLog("failed to generate key: " + err.Error())
 		return
 	}
-	user.SetAccessToken(key)
-
-	if model.DB.Where("access_token = ?", user.AccessToken).First(user).RowsAffected != 0 {
-		common.ApiErrorI18n(c, i18n.MsgUuidDuplicate)
-		return
-	}
-
-	if err := user.Update(false); err != nil {
-		common.ApiError(c, err)
-		return
-	}
+	//user.SetAccessToken(key)
+	//
+	//if model.DB.Where("access_token = ?", user.AccessToken).First(user).RowsAffected != 0 {
+	//	common.ApiErrorI18n(c, i18n.MsgUuidDuplicate)
+	//	return
+	//}
+	//
+	//if err := user.Update(false); err != nil {
+	//	common.ApiError(c, err)
+	//	return
+	//}
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -395,6 +542,14 @@ func GetAffCode(c *gin.Context) {
 	return
 }
 
+// GetSelf
+// @Summary 用户信息
+// @Tags User
+// @Accept json
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} Response{data=model.User} "success"
+// @Router /api/user/self [get]
 func GetSelf(c *gin.Context) {
 	id := c.GetInt("id")
 	userRole := c.GetInt("role")
@@ -436,6 +591,8 @@ func GetSelf(c *gin.Context) {
 		"inviter_id":        user.InviterId,
 		"linux_do_id":       user.LinuxDOId,
 		"setting":           user.Setting,
+		"api_key":           user.ApiKey,
+		"tpm":               user.Tpm,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
 		"permissions":       permissions,                // 新增权限字段
@@ -551,9 +708,15 @@ func GetUserModels(c *gin.Context) {
 	}
 	groups := service.GetUserUsableGroups(user.Group)
 	var models []string
+	tag := c.Query("tag")
 	for group := range groups {
 		for _, g := range model.GetGroupEnabledModels(group) {
 			if !common.StringsContains(models, g) {
+				if tag != "" && !lo.ContainsBy(model.GetPricing(), func(p model.Pricing) bool {
+					return p.ModelName == g && strings.Contains(p.Tags, tag)
+				}) {
+					continue
+				}
 				models = append(models, g)
 			}
 		}
@@ -597,6 +760,11 @@ func UpdateUser(c *gin.Context) {
 	if updatedUser.Password == "$I_LOVE_U" {
 		updatedUser.Password = "" // rollback to what it should be
 	}
+	if updatedUser.Tpm < 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
 	updatePassword := updatedUser.Password != ""
 	if err := updatedUser.Edit(updatePassword); err != nil {
 		common.ApiError(c, err)
@@ -1008,6 +1176,10 @@ func ManageUser(c *gin.Context) {
 			common.SysLog(fmt.Sprintf("failed to invalidate tokens cache for user %d: %s", user.Id, err.Error()))
 		}
 	}
+	// record manage log
+	model.RecordDetailLog(c, c.GetInt("id"), model.LogTypeManage, fmt.Sprintf("对用户 %s 执行了 %s 操作", user.Username, req.Action), map[string]any{
+		"req": req,
+	})
 	clearUser := model.User{
 		Role:   user.Role,
 		Status: user.Status,

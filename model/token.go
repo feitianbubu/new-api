@@ -14,7 +14,7 @@ import (
 type Token struct {
 	Id                 int            `json:"id"`
 	UserId             int            `json:"user_id" gorm:"index"`
-	Key                string         `json:"key" gorm:"type:varchar(128);uniqueIndex"`
+    Key                string         `json:"key" gorm:"type:char(255);uniqueIndex" crypto:"aes"`
 	Status             int            `json:"status" gorm:"default:1"`
 	Name               string         `json:"name" gorm:"index" `
 	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
@@ -185,6 +185,30 @@ func SearchUserTokens(userId int, keyword string, token string, offset int, limi
 	return tokens, total, nil
 }
 
+func tryParseAccessToken(key string) (token *Token, ok bool) {
+	key = strings.ReplaceAll(key, "Bearer ", "")
+	if len(strings.Split(key, ".")) != 3 {
+		return
+	}
+	ok = true
+	u, err := ParseOIDCTokenAsUser(key)
+	if err != nil {
+		token = &Token{Status: common.TokenStatusExpired}
+		return
+	}
+	token = &Token{
+		UserId:         u.Id,
+		Key:            key,
+		Name:           fmt.Sprintf("access-token"),
+		UnlimitedQuota: true,
+		RemainQuota:    -1,
+		Status:         common.TokenStatusEnabled,
+		ExpiredTime:    -1,
+		Group:          u.Group,
+	}
+	return
+}
+
 func ValidateUserToken(key string) (token *Token, err error) {
 	if key == "" {
 		return nil, ErrTokenNotProvided
@@ -263,6 +287,9 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 			})
 		}
 	}()
+	if t, ok := tryParseAccessToken(key); ok {
+		return t, nil
+	}
 	if !fromDB && common.RedisEnabled {
 		// Try Redis first
 		token, err := cacheGetTokenByKey(key)
@@ -272,7 +299,8 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 		// Don't return error - fall through to DB
 	}
 	fromDB = true
-	err = DB.Where(commonKeyCol+" = ?", key).First(&token).Error
+	key = strings.TrimPrefix(key, "sk-")
+	err = cryptoWhere(DB, commonKeyCol, key).First(&token).Error
 	return token, err
 }
 

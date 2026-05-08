@@ -1,0 +1,5 @@
+replace dto.GeneralOpenAIRequest oas.ExampleGeneralOpenAIRequest
+replace dto.ImageRequest oas.ExampleImageRequest
+replace dto.MidjourneyRequest oas.ExampleMidjourneyRequest
+replace dto.EmbeddingRequest oas.ExampleEmbeddingRequest
+replace dto.ClaudeRequest oas.ExampleClaudeRequest

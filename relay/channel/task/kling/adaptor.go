@@ -13,8 +13,6 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 
-	"github.com/samber/lo"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
@@ -61,6 +59,10 @@ type ImageItem struct {
 	Type     string `json:"type,omitempty"` // first_frame or end_frame
 }
 
+type MultiImageRefItem struct {
+	Image string `json:"image,omitempty"`
+}
+
 type ElementItem struct {
 	ElementId int64 `json:"element_id,omitempty"`
 }
@@ -89,8 +91,7 @@ type requestPayload struct {
 	WatermarkInfo  *WatermarkInfo `json:"watermark_info,omitempty"`
 	CallbackUrl    string         `json:"callback_url,omitempty"`
 	ExternalTaskId string         `json:"external_task_id,omitempty"`
-	// Omni-Video specific fields
-	ImageList   []ImageItem   `json:"image_list,omitempty"`
+	ImageList   any           `json:"image_list,omitempty"`
 	ElementList []ElementItem `json:"element_list,omitempty"`
 	VideoList   []VideoItem   `json:"video_list,omitempty"`
 }
@@ -160,18 +161,25 @@ func (a *TaskAdaptor) ValidateRequestAndSetAction(c *gin.Context, info *relaycom
 
 // BuildRequestURL constructs the upstream URL.
 func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	var path string
-	if strings.Contains(info.OriginModelName, "o1") {
-		path = "/v1/videos/omni-video"
-	} else {
-		path = lo.Ternary(info.Action == constant.TaskActionGenerate, "/v1/videos/image2video", "/v1/videos/text2video")
-	}
-
+	path := actionToPath(info.Action, info.OriginModelName)
 	if isNewAPIRelay(info.ApiKey) {
 		return fmt.Sprintf("%s/kling%s", a.baseURL, path), nil
 	}
-
 	return fmt.Sprintf("%s%s", a.baseURL, path), nil
+}
+
+func actionToPath(action, model string) string {
+	if strings.Contains(model, "o1") {
+		return "/v1/videos/omni-video"
+	}
+	switch action {
+	case constant.TaskActionReferenceGenerate:
+		return "/v1/videos/multi-image2video"
+	case constant.TaskActionGenerate:
+		return "/v1/videos/image2video"
+	default:
+		return "/v1/videos/text2video"
+	}
 }
 
 // BuildRequestHeader sets required headers.
@@ -195,12 +203,12 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 		return nil, err
 	}
 
-	body, err := a.convertToRequestPayload(&req, info)
+	body, action, err := a.convertToRequestPayload(&req, info)
 	if err != nil {
 		return nil, err
 	}
-	if body.Image == "" && body.ImageTail == "" {
-		c.Set("action", constant.TaskActionTextGenerate)
+	if action != "" {
+		c.Set("action", action)
 	}
 	data, err := common.Marshal(body)
 	if err != nil {
@@ -254,7 +262,8 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	if !ok {
 		return nil, fmt.Errorf("invalid action")
 	}
-	path := lo.Ternary(action == constant.TaskActionGenerate, "/v1/videos/image2video", "/v1/videos/text2video")
+	model, _ := body["req_key"].(string)
+	path := actionToPath(action, model)
 	url := fmt.Sprintf("%s%s/%s", baseUrl, path, taskID)
 	if isNewAPIRelay(key) {
 		url = fmt.Sprintf("%s/kling%s/%s", baseUrl, path, taskID)
@@ -293,7 +302,7 @@ func (a *TaskAdaptor) GetChannelName() string {
 // helpers
 // ============================
 
-func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, info *relaycommon.RelayInfo) (*requestPayload, error) {
+func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, info *relaycommon.RelayInfo) (*requestPayload, string, error) {
 	r := requestPayload{
 		Prompt:         req.Prompt,
 		Image:          req.Image,
@@ -309,30 +318,48 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 		CallbackUrl:    "",
 		ExternalTaskId: "",
 	}
-	if strings.Contains(req.Model, "o1") {
-		for _, img := range req.Images {
-			r.ImageList = append(r.ImageList, ImageItem{
-				ImageUrl: img,
-			})
+	var action string
+	switch {
+	case strings.Contains(req.Model, "o1"):
+		if n := len(req.Images); n > 0 {
+			items := make([]ImageItem, 0, n)
+			for i, img := range req.Images {
+				item := ImageItem{ImageUrl: img}
+				switch i {
+				case 0:
+					item.Type = "first_frame"
+				case 1:
+					item.Type = "end_frame"
+				}
+				items = append(items, item)
+			}
+			r.ImageList = items
 		}
-		if len(req.Images) > 0 {
-			r.ImageList[0].Type = "first_frame"
+	case len(req.Images) >= 2:
+		n := min(len(req.Images), 4)
+		items := make([]MultiImageRefItem, 0, n)
+		for i := range n {
+			items = append(items, MultiImageRefItem{Image: req.Images[i]})
 		}
-		if len(req.Images) > 1 {
-			r.ImageList[1].Type = "end_frame"
-		}
-	} else {
+		r.ImageList = items
+		action = constant.TaskActionReferenceGenerate
+	default:
 		if len(req.Images) > 0 {
 			r.Image = req.Images[0]
 		}
-		if len(req.Images) > 1 {
-			r.ImageTail = req.Images[1]
-		}
 	}
 	if err := taskcommon.UnmarshalMetadata(req.Metadata, &r); err != nil {
-		return nil, errors.Wrap(err, "unmarshal metadata failed")
+		return nil, "", errors.Wrap(err, "unmarshal metadata failed")
 	}
-	return &r, nil
+	if action == "" && !strings.Contains(req.Model, "o1") {
+		switch {
+		case r.ImageList != nil:
+			action = constant.TaskActionReferenceGenerate
+		case r.Image == "" && r.ImageTail == "":
+			action = constant.TaskActionTextGenerate
+		}
+	}
+	return &r, action, nil
 }
 
 func (a *TaskAdaptor) getAspectRatio(size string) string {

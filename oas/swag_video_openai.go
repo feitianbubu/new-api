@@ -10,6 +10,7 @@ import (
 // @Description
 // @Description * OpenAI: https://platform.openai.com/docs/api-reference/videos/create
 // @Description * 万相: https://www.alibabacloud.com/help/zh/model-studio/image-to-video-api-reference
+// @Description * happyhorse: https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference
 // @Description * 可灵: https://app.klingai.com/cn/dev/document-api/apiReference/model/skillsMap
 // @Description * 即梦: https://www.volcengine.com/docs/85621/1792707
 // @Description * 即梦数字人: https://www.volcengine.com/docs/85621/1829013

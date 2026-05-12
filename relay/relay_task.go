@@ -283,28 +283,18 @@ func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float6
 }
 
 func appendFileToImages(c *gin.Context) error {
-	imageFiles, err := channel.ExtractImageFilesFromMultipart(c, []string{"input_reference", "image", "file"})
-	if err != nil {
-		return fmt.Errorf("extract_image_files_failed: %w", err)
+	var urls []string
+	for _, field := range []string{"input_reference", "image", "file"} {
+		urls = append(urls, c.PostFormArray(field)...)
 	}
-	if len(imageFiles) == 0 {
+	if len(urls) == 0 {
 		return nil
 	}
 	taskReq, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
 		return err
 	}
-	for _, imageFile := range imageFiles {
-		userID := channel.GetUserIDFromContext(c)
-		imageURL, err := channel.UploadImageFile(c, imageFile, userID, channel.ImageUploadOptions{
-			Purpose:        "task_input_reference",
-			ExpiresSeconds: 7200,
-		})
-		if err != nil {
-			return fmt.Errorf("upload_image_file_failed: %w", err)
-		}
-		taskReq.Images = append(taskReq.Images, imageURL)
-	}
+	taskReq.Images = append(taskReq.Images, urls...)
 	c.Set("task_request", taskReq)
 	return nil
 }

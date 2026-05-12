@@ -1,11 +1,8 @@
 package doubao
 
 import (
-	relaychannel "github.com/QuantumNous/new-api/relay/channel"
 	"github.com/gin-gonic/gin"
 )
-
-const videoUploadPurpose = "doubao_video_file"
 
 type mediaFieldDef struct {
 	fieldName string
@@ -20,24 +17,12 @@ var mediaFields = []mediaFieldDef{
 	{"audio_url", "audio_url", "reference_audio", func(ci *ContentItem, url string) { ci.AudioURL = &MediaURL{URL: url} }},
 }
 
-func appendMultipartMediaToContent(c *gin.Context, body *requestPayload) error {
-	uploadOpts := relaychannel.ImageUploadOptions{
-		Purpose:        videoUploadPurpose,
-		ExpiresSeconds: 7200,
-	}
-
+func appendMultipartMediaToContent(c *gin.Context, body *requestPayload) {
 	for _, mf := range mediaFields {
-		urls, err := relaychannel.TryConvertMultipartFieldsToURLs(c, []string{mf.fieldName}, uploadOpts)
-		if err != nil {
-			return err
-		}
-
-		for _, u := range urls {
+		for _, u := range c.PostFormArray(mf.fieldName) {
 			ci := ContentItem{Type: mf.itemType, Role: mf.role}
 			mf.setURL(&ci, u)
 			body.Content = append(body.Content, ci)
 		}
 	}
-
-	return nil
 }

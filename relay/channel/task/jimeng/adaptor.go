@@ -137,9 +137,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, err
 	}
-	if err := tryConvertOmniHumanFilesToURLs(c, &req); err != nil {
-		return nil, errors.Wrap(err, "convert omnihuman files to urls failed")
-	}
+	tryConvertOmniHumanFilesToURLs(c, &req)
 	// 支持openai sdk的图片上传方式
 	if mf, err := c.MultipartForm(); err == nil && len(req.Images) == 0 {
 		if files, exists := mf.File["input_reference"]; exists && len(files) > 0 {

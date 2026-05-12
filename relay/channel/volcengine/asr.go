@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
@@ -136,26 +137,14 @@ type DoubaoASRAudioInfo struct {
 }
 
 func (a *Adaptor) convertASRRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	audioFiles, err := channel.ExtractMultipartFilesFromMultipart(c, []string{"file"})
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract audio file: %w", err)
-	}
-	if len(audioFiles) == 0 {
+	audioURLs := c.PostFormArray("file")
+	if len(audioURLs) == 0 {
 		return nil, fmt.Errorf("no audio file found in request")
 	}
-
-	fileHeader := audioFiles[0]
+	audioURL := audioURLs[0]
 	userID := channel.GetUserIDFromContext(c)
-
-	audioURL, err := channel.UploadMultipartFile(c, fileHeader, userID, channel.ImageUploadOptions{
-		Purpose:        "volcengine_asr",
-		ExpiresSeconds: 3600,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload audio file: %w", err)
-	}
-
-	audioFormat := detectAudioFormat(fileHeader.Filename)
+	originalFilename := middleware.MultipartUploadedFilename(c, "file")
+	audioFormat := detectAudioFormat(originalFilename)
 
 	requestID := generateRequestID()
 	c.Set(contextKeyASRRequestID, requestID)

@@ -186,9 +186,7 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request payload failed")
 	}
-	if err := appendMultipartMediaToContent(c, body); err != nil {
-		return nil, errors.Wrap(err, "append multipart media failed")
-	}
+	appendMultipartMediaToContent(c, body)
 	if info.IsModelMapped {
 		body.Model = info.UpstreamModelName
 	} else {

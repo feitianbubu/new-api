@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	relaychannel "github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
@@ -19,8 +18,6 @@ var omniHumanModels = []string{
 	"jimeng_realman_avatar_picture_omni_v15",
 }
 
-const omniHumanUploadPurpose = "jimeng_omnihuman_file"
-
 func isOmniHumanModel(name string) bool {
 	for _, modelName := range omniHumanModels {
 		if name == modelName {
@@ -30,34 +27,24 @@ func isOmniHumanModel(name string) bool {
 	return false
 }
 
-func tryConvertOmniHumanFilesToURLs(c *gin.Context, req *relaycommon.TaskSubmitReq) error {
-	if !isOmniHumanModel(req.Model) || c.ContentType() != gin.MIMEMultipartPOSTForm {
-		return nil
+// tryConvertOmniHumanFilesToURLs 取单值 URL 写到 Metadata；已有 Metadata 值优先保留。
+func tryConvertOmniHumanFilesToURLs(c *gin.Context, req *relaycommon.TaskSubmitReq) {
+	if !isOmniHumanModel(req.Model) {
+		return
 	}
-
 	for _, fieldName := range []string{"image_url", "audio_url"} {
-		currentValue, _ := req.Metadata[fieldName].(string)
-		fileURL, converted, err := relaychannel.TryConvertMultipartSingleFileFieldToURL(
-			c,
-			currentValue,
-			[]string{fieldName},
-			relaychannel.ImageUploadOptions{
-				Purpose:        omniHumanUploadPurpose,
-				ExpiresSeconds: 3600,
-			},
-		)
-		if err != nil {
-			return err
+		if existing, _ := req.Metadata[fieldName].(string); strings.TrimSpace(existing) != "" {
+			continue
 		}
-		if !converted {
+		urls := c.PostFormArray(fieldName)
+		if len(urls) == 0 {
 			continue
 		}
 		if req.Metadata == nil {
 			req.Metadata = make(map[string]interface{})
 		}
-		req.Metadata[fieldName] = fileURL
+		req.Metadata[fieldName] = urls[0]
 	}
-	return nil
 }
 
 func resolveOmniHumanBillingSeconds(c *gin.Context, reqModel string, body *requestPayload) (int, bool, error) {

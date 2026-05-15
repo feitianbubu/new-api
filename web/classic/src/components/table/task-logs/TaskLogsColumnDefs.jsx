@@ -39,7 +39,11 @@ import {
   TASK_ACTION_GENERATE,
   TASK_ACTION_REFERENCE_GENERATE,
   TASK_ACTION_TEXT_GENERATE,
+  TASK_ACTION_MUSIC,
+  TASK_ACTION_UPLOAD_COVER,
   TASK_ACTION_REMIX_GENERATE,
+  TASK_ACTION_MULTI_FRAME_GENERATE,
+  MUSIC_TASK_ACTIONS,
 } from '../../../constants/common.constant';
 import { CHANNEL_OPTIONS } from '../../../constants/channel.constants';
 import { stringToColor } from '../../../helpers/render';
@@ -96,6 +100,12 @@ const renderType = (type, t) => {
       return (
         <Tag color='grey' shape='circle' prefixIcon={<Music size={14} />}>
           {t('生成音乐')}
+        </Tag>
+      );
+    case TASK_ACTION_UPLOAD_COVER:
+      return (
+        <Tag color='violet' shape='circle' prefixIcon={<Music size={14} />}>
+          {t('翻唱歌曲')}
         </Tag>
       );
     case 'LYRICS':
@@ -413,7 +423,9 @@ export const getTaskLogsColumns = ({
           record.action === TASK_ACTION_TEXT_GENERATE ||
           record.action === TASK_ACTION_FIRST_TAIL_GENERATE ||
           record.action === TASK_ACTION_REFERENCE_GENERATE ||
-          record.action === TASK_ACTION_REMIX_GENERATE;
+          record.action === TASK_ACTION_REMIX_GENERATE ||
+          record.action === TASK_ACTION_MULTI_FRAME_GENERATE;
+        const isMusicTask = MUSIC_TASK_ACTIONS.includes(record.action);
         const isSuccess = record.status === 'SUCCESS';
         const resultUrl = record.result_url;
         const hasResultUrl = typeof resultUrl === 'string' && /^https?:\/\//.test(resultUrl);

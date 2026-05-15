@@ -189,6 +189,7 @@ func SetRelayRouter(router *gin.Engine) {
 		relaySunoRouter.GET("/fetch/:id", controller.RelayTaskFetch)
 
 		relaySunoRouter.POST("/api/v1/generate", controller.RelayTask)
+		relaySunoRouter.POST("/api/v1/generate/:action", controller.RelayTask)
 	}
 
 	relayGeminiRouter := router.Group("/v1beta")

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -41,7 +43,7 @@ type OfficialSunoResponseData struct {
 	} `json:"response"`
 	Status       string  `json:"status"`
 	Type         string  `json:"type"`
-	ErrorCode    *string `json:"errorCode"`
+	ErrorCode    *int    `json:"errorCode"`
 	ErrorMessage *string `json:"errorMessage"`
 	CreateTime   int64   `json:"createTime"`
 }
@@ -64,9 +66,14 @@ func (r *OfficialSunoResponse) ToStandardResponse() dto.TaskResponse[[]dto.SunoD
 		failReason = *r.Data.ErrorMessage
 	}
 
+	status := r.Data.Status
+	if strings.HasSuffix(status, "_FAILED") || r.Data.ErrorCode != nil || failReason != "" {
+		status = model.TaskStatusFailure
+	}
+
 	var finishTime int64
 	var url string
-	if r.Data.Status == "SUCCESS" {
+	if status == model.TaskStatusSuccess {
 		finishTime = time.Now().Unix()
 		if sunoData := r.Data.Response.SunoData; len(sunoData) > 0 {
 			url = sunoData[0].AudioURL
@@ -81,7 +88,7 @@ func (r *OfficialSunoResponse) ToStandardResponse() dto.TaskResponse[[]dto.SunoD
 
 	sunoDataResponse := dto.SunoDataResponse{
 		TaskID:     r.Data.TaskID,
-		Status:     r.Data.Status,
+		Status:     status,
 		FailReason: failReason,
 		Url:        url,
 		SubmitTime: r.Data.CreateTime / 1000, // to seconds

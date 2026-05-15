@@ -8,8 +8,9 @@ const (
 )
 
 const (
-	SunoActionMusic  = "MUSIC"
-	SunoActionLyrics = "LYRICS"
+	SunoActionMusic       = "MUSIC"
+	SunoActionLyrics      = "LYRICS"
+	SunoActionUploadCover = "UPLOAD-COVER"
 
 	TaskActionGenerate          = "generate"
 	TaskActionTextGenerate      = "textGenerate"
@@ -20,6 +21,7 @@ const (
 )
 
 var SunoModel2Action = map[string]string{
-	"suno_music":  SunoActionMusic,
-	"suno_lyrics": SunoActionLyrics,
+	"suno_music":        SunoActionMusic,
+	"suno_lyrics":       SunoActionLyrics,
+	"suno_upload-cover": SunoActionUploadCover,
 }

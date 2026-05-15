@@ -43,4 +43,12 @@ export const TASK_ACTION_GENERATE = 'generate';
 export const TASK_ACTION_TEXT_GENERATE = 'textGenerate';
 export const TASK_ACTION_FIRST_TAIL_GENERATE = 'firstTailGenerate';
 export const TASK_ACTION_REFERENCE_GENERATE = 'referenceGenerate';
+export const TASK_ACTION_MUSIC = 'MUSIC';
+export const TASK_ACTION_UPLOAD_COVER = 'UPLOAD-COVER';
 export const TASK_ACTION_REMIX_GENERATE = 'remixGenerate';
+export const TASK_ACTION_MULTI_FRAME_GENERATE = 'multiFrameGenerate';
+
+export const MUSIC_TASK_ACTIONS = [
+  TASK_ACTION_MUSIC,
+  TASK_ACTION_UPLOAD_COVER,
+];

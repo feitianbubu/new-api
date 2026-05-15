@@ -18,6 +18,16 @@ type SunoSubmitReq struct {
 	Model                string  `json:"model,omitempty"`
 	CallBackUrl          string  `json:"callBackUrl"`
 	CustomMode           bool    `json:"customMode"`
+
+	UploadUrl           string   `json:"uploadUrl,omitempty"`
+	Style               string   `json:"style,omitempty"`
+	NegativeTags        string   `json:"negativeTags,omitempty"`
+	PersonaId           string   `json:"personaId,omitempty"`
+	PersonaModel        string   `json:"personaModel,omitempty"`
+	VocalGender         string   `json:"vocalGender,omitempty"`
+	StyleWeight         *float64 `json:"styleWeight,omitempty"`
+	WeirdnessConstraint *float64 `json:"weirdnessConstraint,omitempty"`
+	AudioWeight         *float64 `json:"audioWeight,omitempty"`
 }
 
 type SunoDataResponse struct {

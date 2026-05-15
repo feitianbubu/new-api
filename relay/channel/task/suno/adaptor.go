@@ -76,6 +76,8 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 		switch info.Action {
 		case constant.SunoActionMusic:
 			fullRequestURL = fmt.Sprintf("%s/api/v1/generate", baseURL)
+		case constant.SunoActionUploadCover:
+			fullRequestURL = fmt.Sprintf("%s/api/v1/generate/upload-cover", baseURL)
 		}
 	}
 	return fullRequestURL, nil
@@ -181,6 +183,7 @@ func actionValidate(c *gin.Context, sunoRequest *dto.SunoSubmitReq, action strin
 			err = fmt.Errorf("prompt_empty")
 			return
 		}
+	case constant.SunoActionUploadCover:
 	default:
 		err = fmt.Errorf("invalid_action")
 	}

@@ -192,6 +192,49 @@ func (a *TaskAdaptor) fetchOfficialOneTask(baseUrl, key, taskId string) (dto.Sun
 	return standard.Data[0], nil
 }
 
+func (a *TaskAdaptor) UpdateBalance(channel *model.Channel) (float64, error) {
+	baseURL := channel.GetBaseURL()
+	if baseURL == "" {
+		return 0, errors.New("base url is empty")
+	}
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/generate/credit", baseURL), nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+channel.Key)
+
+	client, err := service.NewProxyHttpClient(channel.GetSetting().Proxy)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var creditResp struct {
+		Code int     `json:"code"`
+		Msg  string  `json:"msg"`
+		Data float64 `json:"data"`
+	}
+	if err := common.Unmarshal(bodyBytes, &creditResp); err != nil {
+		return 0, errors.Wrapf(err, "response body: %s", string(bodyBytes))
+	}
+	if creditResp.Code != http.StatusOK {
+		return 0, fmt.Errorf("suno credit query failed: code=%d, msg=%s", creditResp.Code, creditResp.Msg)
+	}
+	channel.UpdateBalance(creditResp.Data)
+	return creditResp.Data, nil
+}
+
 func ParseResponseItems(responseBody []byte) (dto.TaskResponse[[]dto.SunoDataResponse], error) {
 	var responseItems dto.TaskResponse[[]dto.SunoDataResponse]
 	var officialResp OfficialSunoResponse

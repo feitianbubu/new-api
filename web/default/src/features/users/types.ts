@@ -58,6 +58,7 @@ export const userSchema = z.object({
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
   tpm: z.number().optional(),
+  api_key: z.boolean().optional(),
 })
 export type User = z.infer<typeof userSchema>
 

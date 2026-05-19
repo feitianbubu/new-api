@@ -26,6 +26,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// User.AccessToken 用 json:"-" 不直接序列化，登录响应通过此结构显式暴露。
+type loginResponse struct {
+	model.User
+	AccessToken *string `json:"access_token"`
+}
+
+func newLoginResponse(u model.User) loginResponse {
+	return loginResponse{User: u, AccessToken: u.AccessToken}
+}
+
 // handleOAuthCallback 处理OAuth回调逻辑
 func handleOAuthCallback(user *model.User, session sessions.Session, c *gin.Context) {
 	var pendingData map[string]interface{}
@@ -90,7 +100,7 @@ func handleOAuthCallback(user *model.User, session sessions.Session, c *gin.Cont
 		c.JSON(http.StatusOK, gin.H{
 			"message":        "",
 			"success":        true,
-			"data":           cleanUser,
+			"data":           newLoginResponse(cleanUser),
 			"oauth_callback": callbackURL.String(),
 		})
 	} else {
@@ -265,7 +275,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
-		"data":    cleanUser,
+		"data":    newLoginResponse(cleanUser),
 	})
 }
 

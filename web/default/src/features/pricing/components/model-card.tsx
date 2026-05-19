@@ -53,7 +53,13 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const usdExchangeRate = props.usdExchangeRate ?? 1
   const showRechargePrice = props.showRechargePrice ?? false
   const isTokenBased = isTokenBasedModel(props.model)
-  const tokenUnitLabel = tokenUnit === 'K' ? '1K' : '1M'
+  const isCreditUnit = props.model.quota_show_type === 'credit'
+  const isPerSecond = props.model.quota_show_type === 'second'
+  const tokenUnitLabel = isCreditUnit
+    ? t('Credit')
+    : tokenUnit === 'K'
+      ? '1K'
+      : '1M'
   const tags = parseTags(props.model.tags)
   const groups = props.model.enable_groups || []
   const endpoints = props.model.supported_endpoint_types || []
@@ -195,7 +201,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                       usdExchangeRate
                     )}
                   </span>{' '}
-                  / {t('request')}
+                  / {isPerSecond ? t('Second') : t('request')}
                 </span>
               )}
             </div>

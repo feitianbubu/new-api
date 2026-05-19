@@ -25,7 +25,7 @@ import (
 // @Summary 上传文件
 // @Description 上传文件到对象存储服务，兼容 OpenAI Files API 格式
 // @Description 基于OpenAI Files API规范，支持文件上传、列出、获取信息、删除等操作
-// @Description - 参考文档：https://platform.openai.com/docs/api-reference/files
+// @Description - 参考文档：https://developers.openai.com/api/reference/resources/files/methods/list
 // @Tags Files
 // @Accept multipart/form-data
 // @Produce json

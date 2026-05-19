@@ -8,7 +8,7 @@ import (
 // @Summary 视频生成
 // @Description 根据文本提示词生成视频。可选择上传参考图片来引导视频生成。
 // @Description
-// @Description * OpenAI: https://platform.openai.com/docs/api-reference/videos/create
+// @Description * OpenAI: https://developers.openai.com/api/reference/resources/videos/methods/create
 // @Description * 万相: https://www.alibabacloud.com/help/zh/model-studio/image-to-video-api-reference
 // @Description * happyhorse: https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference
 // @Description * 可灵: https://app.klingai.com/cn/dev/document-api/apiReference/model/skillsMap
@@ -104,7 +104,7 @@ func OpenAIVideos(c *gin.Context) {}
 // @Summary 视频查询
 // @Description 根据任务ID查询视频生成的状态和结果。可获取生成进度、输出URL等信息。
 // @Description
-// @Description 参考文档: https://platform.openai.com/docs/api-reference/videos/retrieve
+// @Description 参考文档: https://developers.openai.com/api/reference/resources/videos/methods/retrieve
 // @Description
 // @Description 示例请求:
 // @Description		```

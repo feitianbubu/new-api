@@ -73,27 +73,41 @@ type VideoItem struct {
 	KeepOriginalSound string `json:"keep_original_sound,omitempty"` // yes or no
 }
 
+type MultiPromptItem struct {
+	Index    int    `json:"index"`
+	Prompt   string `json:"prompt,omitempty"`
+	Duration string `json:"duration,omitempty"`
+}
+
+type VoiceItem struct {
+	VoiceId string `json:"voice_id,omitempty"`
+}
+
 type requestPayload struct {
-	Prompt         string         `json:"prompt,omitempty"`
-	Image          string         `json:"image,omitempty"`
-	ImageTail      string         `json:"image_tail,omitempty"`
-	NegativePrompt string         `json:"negative_prompt,omitempty"`
-	Sound          string         `json:"sound,omitempty"` // on or off; only supported by v2.6+
-	Mode           string         `json:"mode,omitempty"`
-	Duration       string         `json:"duration,omitempty"`
-	AspectRatio    string         `json:"aspect_ratio,omitempty"`
-	ModelName      string         `json:"model_name,omitempty"`
-	Model          string         `json:"model,omitempty"` // Compatible with upstreams that only recognize "model"
-	CfgScale       float64        `json:"cfg_scale,omitempty"`
-	StaticMask     string         `json:"static_mask,omitempty"`
-	DynamicMasks   []DynamicMask  `json:"dynamic_masks,omitempty"`
-	CameraControl  *CameraControl `json:"camera_control,omitempty"`
-	WatermarkInfo  *WatermarkInfo `json:"watermark_info,omitempty"`
-	CallbackUrl    string         `json:"callback_url,omitempty"`
-	ExternalTaskId string         `json:"external_task_id,omitempty"`
-	ImageList   any           `json:"image_list,omitempty"`
-	ElementList []ElementItem `json:"element_list,omitempty"`
-	VideoList   []VideoItem   `json:"video_list,omitempty"`
+	Prompt         string            `json:"prompt,omitempty"`
+	Image          string            `json:"image,omitempty"`
+	ImageTail      string            `json:"image_tail,omitempty"`
+	NegativePrompt string            `json:"negative_prompt,omitempty"`
+	Sound          string            `json:"sound,omitempty"` // on or off; only supported by v2.6+
+	Mode           string            `json:"mode,omitempty"`
+	Duration       string            `json:"duration,omitempty"`
+	AspectRatio    string            `json:"aspect_ratio,omitempty"`
+	ModelName      string            `json:"model_name,omitempty"`
+	Model          string            `json:"model,omitempty"` // Compatible with upstreams that only recognize "model"
+	CfgScale       float64           `json:"cfg_scale,omitempty"`
+	StaticMask     string            `json:"static_mask,omitempty"`
+	DynamicMasks   []DynamicMask     `json:"dynamic_masks,omitempty"`
+	CameraControl  *CameraControl    `json:"camera_control,omitempty"`
+	WatermarkInfo  *WatermarkInfo    `json:"watermark_info,omitempty"`
+	CallbackUrl    string            `json:"callback_url,omitempty"`
+	ExternalTaskId string            `json:"external_task_id,omitempty"`
+	ImageList      any               `json:"image_list,omitempty"`
+	ElementList    []ElementItem     `json:"element_list,omitempty"`
+	VideoList      []VideoItem       `json:"video_list,omitempty"`
+	MultiShot      *bool             `json:"multi_shot,omitempty"`
+	ShotType       string            `json:"shot_type,omitempty"`
+	MultiPrompt    []MultiPromptItem `json:"multi_prompt,omitempty"`
+	VoiceList      []VoiceItem       `json:"voice_list,omitempty"`
 }
 
 type WatermarkInfo struct {
@@ -291,7 +305,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 }
 
 func (a *TaskAdaptor) GetModelList() []string {
-	return []string{"kling-v1", "kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6"}
+	return []string{"kling-v1", "kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6", "kling-v3"}
 }
 
 func (a *TaskAdaptor) GetChannelName() string {

@@ -36,6 +36,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
+import { DataTableColumnHeader } from '@/components/data-table'
 import { LOG_TYPE_ALL_VALUE } from '../../constants'
 import type { UsageLog } from '../../data/schema'
 import {
@@ -747,8 +748,32 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
           </div>
         )
       },
-    },
+      meta: { label: t('Cost') },
+    }
+  )
 
+  if (isAdmin) {
+    columns.push({
+      id: 'instance',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Instance')} />
+      ),
+      cell: ({ row }) => {
+        const log = row.original
+        const instance =
+          log.instance || parseLogOther(log.other)?.instance || ''
+        if (!instance) return null
+        return (
+          <StatusBadge variant='cyan' copyable className='font-mono text-xs'>
+            {instance}
+          </StatusBadge>
+        )
+      },
+      meta: { label: t('Instance') },
+    })
+  }
+
+  columns.push(
     {
       accessorKey: 'content',
       header: t('Details'),

@@ -59,6 +59,12 @@ export type PricingModel = {
   /** Unix timestamp (seconds) when the model was first created */
   created_time?: number
   /**
+   * Display style hint provided by backend for per-request billing.
+   * - 'credit' renders prices in "积分" (credits) instead of token units.
+   * - 'second' appends a "/秒" (per second) suffix to per-call prices.
+   */
+  quota_show_type?: 'credit' | 'second'
+  /**
    * Optional model metadata fields. These are not yet returned by the backend
    * and are populated client-side from {@link inferModelMetadata}.
    * When the backend ships these fields, the inference layer becomes a

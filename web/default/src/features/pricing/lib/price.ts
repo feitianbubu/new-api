@@ -186,7 +186,11 @@ export function formatPrice(
     usdExchangeRate
   )
 
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
+  const divisor =
+    model.quota_show_type === 'credit'
+      ? 1_000_000
+      : TOKEN_UNIT_DIVISORS[tokenUnit]
+  const price = priceInUSD / divisor
   return formatCurrencyFromUSD(price, {
     digitsLarge: 4,
     digitsSmall: 6,
@@ -221,7 +225,11 @@ export function formatGroupPrice(
     usdExchangeRate
   )
 
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
+  const divisor =
+    model.quota_show_type === 'credit'
+      ? 1_000_000
+      : TOKEN_UNIT_DIVISORS[tokenUnit]
+  const price = priceInUSD / divisor
   return formatCurrencyFromUSD(price, {
     digitsLarge: 4,
     digitsSmall: 6,

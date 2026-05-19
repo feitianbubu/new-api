@@ -126,6 +126,9 @@ export function sortModels(
     case SORT_OPTIONS.PRICE_HIGH:
       sorted.sort((a, b) => getModelPrice(b) - getModelPrice(a))
       break
+    default:
+      sorted.sort((a, b) => (b.created_time ?? 0) - (a.created_time ?? 0))
+      break
   }
 
   return sorted

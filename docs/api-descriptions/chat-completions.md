@@ -3,7 +3,7 @@
 本接口兼容 OpenAI API 格式的聊天模型调用，支持流式和非流式响应，并具备全模态理解能力，包括文本、图像、音频、视频等。
 
 ## OpenAI支持的模态与文档
-- [文本](https://platform.openai.com/docs/api-reference/chat)
+- [文本](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
 - [视觉](https://platform.openai.com/docs/guides/images-vision?api-mode=chat)
 - [音频](https://platform.openai.com/docs/guides/audio?example=audio-in)
 - [文件](https://platform.openai.com/docs/guides/pdf-files?api-mode=chat)

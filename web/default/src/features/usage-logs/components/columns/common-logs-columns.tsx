@@ -20,7 +20,7 @@ import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { CircleAlert, Eye, Sparkles, KeyRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
+import { getUserAvatarLabel, getUserAvatarStyle } from '@/lib/avatar'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import {
   formatUseTime,
@@ -442,7 +442,9 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
                       : undefined
                   }
                 >
-                  {sensitiveVisible ? getUserAvatarFallback(log.username) : '•'}
+                  {sensitiveVisible
+                    ? getUserAvatarLabel(log.display_name, log.username)
+                    : '•'}
                 </AvatarFallback>
               </Avatar>
               <TooltipProvider delay={300}>

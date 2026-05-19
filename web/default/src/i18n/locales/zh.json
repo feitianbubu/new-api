@@ -4549,6 +4549,8 @@
     "Error loading changelog": "加载更新日志时出错",
     "Cover Song": "翻唱歌曲",
     "Allow this user to use API tokens": "允许该用户使用 API 令牌",
+    "Credit": "积分",
+    "Second": "秒",
 
     "Zoom": "缩放"
   }

@@ -43,3 +43,25 @@ export function getUserAvatarStyle(name: string): UserAvatarStyle {
 export function getUserAvatarFallback(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?'
 }
+
+/**
+ * Build avatar fallback label preferring display_name (with trailing
+ * parenthesized note stripped) and showing its last 2 characters; falls
+ * back to username's last 2 characters.
+ */
+export function getUserAvatarLabel(
+  displayName?: string | null,
+  username?: string | null
+): string {
+  const name = (displayName ?? '').trim()
+  if (name) {
+    const cleaned = name.replace(/[（(][^）)]*[）)]\s*$/u, '') || name
+    const tail = Array.from(cleaned).slice(-2).join('')
+    if (tail) return tail
+  }
+  const fallbackSource = (username ?? '').trim()
+  if (fallbackSource) {
+    return Array.from(fallbackSource).slice(-2).join('') || '?'
+  }
+  return '?'
+}

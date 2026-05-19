@@ -174,6 +174,7 @@ export const MJ_SUBMIT_RESULT_CODES = {
 export const TASK_ACTIONS = {
   // Suno (uppercase)
   MUSIC: 'MUSIC', // 生成音乐
+  UPLOAD_COVER: 'UPLOAD-COVER', // 翻唱歌曲
   LYRICS: 'LYRICS', // 生成歌词
 
   // Video generation (camelCase)
@@ -283,6 +284,7 @@ export const MJ_SUBMIT_RESULT_MAPPINGS: Record<string, StatusMapping> = {
  */
 export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
   [TASK_ACTIONS.MUSIC]: { label: 'Generate Music', variant: 'neutral' },
+  [TASK_ACTIONS.UPLOAD_COVER]: { label: 'Cover Song', variant: 'violet' },
   [TASK_ACTIONS.LYRICS]: { label: 'Generate Lyrics', variant: 'pink' },
   [TASK_ACTIONS.GENERATE]: { label: 'Image to Video', variant: 'blue' },
   [TASK_ACTIONS.TEXT_GENERATE]: { label: 'Text to Video', variant: 'blue' },

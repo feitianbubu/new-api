@@ -5,7 +5,7 @@ package oas
 // @Description openAI新版Responses接口，用于多模态和更复杂的响应场景。支持web-search等功能。
 // @Description **注意**: beta版目前只有openAI官方渠道(gpt系列)和火山官方渠道(豆包系列)支持该接口。 其他渠道需要后续厂商适配。
 // @Description
-// @Description **文档**: https://platform.openai.com/docs/api-reference/responses/create
+// @Description **文档**: https://developers.openai.com/api/reference/resources/responses/methods/create
 // @Description
 // @Description **示例**:
 // @Description ```json

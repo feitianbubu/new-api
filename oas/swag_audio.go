@@ -4,7 +4,7 @@ package oas
 // @Summary 语音识别
 // @Description 将音频文件转录为文字(ASR)
 // @Description
-// @Description * OpenAI: https://platform.openai.com/docs/api-reference/audio/createTranscription
+// @Description * OpenAI: https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create
 // @Description * 豆包语音识别2.0: https://www.volcengine.com/docs/6561/1354868
 // @Description
 // @Description **示例**:
@@ -60,7 +60,7 @@ func AudioSpeech() {
 // @Summary 音频翻译
 // @Description 将音频文件翻译为英文
 // @Description
-// @Description **文档**: https://platform.openai.com/docs/api-reference/audio/createTranslation
+// @Description **文档**: https://developers.openai.com/api/reference/resources/audio/subresources/translations/methods/create
 // @Description
 // @Description **示例**:
 // @Description ```bash

@@ -5,7 +5,7 @@ import "github.com/gin-gonic/gin"
 // ImagesEdits swagger 图像编辑
 // @Summary 图像编辑
 // @Description 根据用户提供的源图像、遮罩和文本提示，编辑现有图像
-// @Description * OAI文档: https://platform.openai.com/docs/api-reference/images/createEdit
+// @Description * OAI文档: https://developers.openai.com/api/reference/resources/images/methods/edit
 // @Description * 其他文档参考: <a href="#tag/openai/POST/v1/images/generations">图像生成</a>
 // @Tags OpenAI
 // @Accept multipart/form-data

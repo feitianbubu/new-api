@@ -273,6 +273,13 @@ export interface TaskLog {
   fail_reason?: string
   status: string // NOT_START, SUBMITTED, IN_PROGRESS, SUCCESS, FAILURE, QUEUED, UNKNOWN
   other?: string
+  properties?:
+    | string
+    | {
+        upstream_model_name?: string
+        origin_model_name?: string
+        [key: string]: unknown
+      }
   created_at?: number
   updated_at?: number
 }

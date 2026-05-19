@@ -26,6 +26,7 @@ import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/status-badge'
+import { DataTableColumnHeader } from '@/components/data-table'
 import { TASK_ACTIONS, TASK_STATUS } from '../../constants'
 import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
 import type { TaskLog } from '../../types'
@@ -35,11 +36,26 @@ import {
 } from '../dialogs/audio-preview-dialog'
 import { FailReasonDialog } from '../dialogs/fail-reason-dialog'
 import { useUsageLogsContext } from '../usage-logs-provider'
+import { ModelBadge } from '../model-badge'
 import {
   createDurationColumn,
   createChannelColumn,
   createProgressColumn,
 } from './column-helpers'
+
+function parseTaskProperties(
+  properties: TaskLog['properties']
+): { upstream_model_name?: string; origin_model_name?: string } {
+  if (!properties) return {}
+  if (typeof properties === 'string') {
+    try {
+      return JSON.parse(properties) ?? {}
+    } catch {
+      return {}
+    }
+  }
+  return properties
+}
 
 function parseTaskData(data: unknown): unknown[] {
   if (Array.isArray(data)) return data
@@ -185,6 +201,21 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
         )
       },
       meta: { mobileTitle: true },
+    },
+    {
+      id: 'model',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Model')} />
+      ),
+      cell: ({ row }) => {
+        const props = parseTaskProperties(row.original.properties)
+        const modelName = props.upstream_model_name || props.origin_model_name
+        if (!modelName) {
+          return <span className='text-muted-foreground/60 text-xs'>-</span>
+        }
+        return <ModelBadge modelName={modelName} />
+      },
+      meta: { label: t('Model') },
     },
     createDurationColumn<TaskLog>({
       submitTimeKey: 'submit_time',

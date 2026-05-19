@@ -764,8 +764,31 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
         )
       },
       meta: { label: t('Cost') },
-    },
+    }
+  )
 
+  if (isAdmin) {
+    columns.push({
+      id: 'instance',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Instance')} />
+      ),
+      cell: ({ row }) => {
+        const log = row.original
+        const instance =
+          log.instance || parseLogOther(log.other)?.instance || ''
+        if (!instance) return null
+        return (
+          <StatusBadge variant='cyan' copyable className='font-mono text-xs'>
+            {instance}
+          </StatusBadge>
+        )
+      },
+      meta: { label: t('Instance') },
+    })
+  }
+
+  columns.push(
     {
       accessorKey: 'content',
       header: t('Details'),

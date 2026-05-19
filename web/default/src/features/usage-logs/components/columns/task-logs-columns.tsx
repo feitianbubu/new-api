@@ -284,8 +284,24 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
           log.action === TASK_ACTIONS.REFERENCE_GENERATE ||
           log.action === TASK_ACTIONS.REMIX_GENERATE ||
           log.action === TASK_ACTIONS.MULTI_FRAME_GENERATE
+        const isMusicTask =
+          log.action === TASK_ACTIONS.MUSIC ||
+          log.action === TASK_ACTIONS.UPLOAD_COVER
         const isSuccess = status === TASK_STATUS.SUCCESS
         const isUrl = failReason?.startsWith('http')
+
+        if (isSuccess && isMusicTask && isUrl) {
+          return (
+            <a
+              href={failReason}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-foreground text-xs hover:underline'
+            >
+              {t('Click to preview audio')}
+            </a>
+          )
+        }
 
         if (isSuccess && isVideoTask && isUrl) {
           const videoUrl = `/v1/videos/${log.task_id}/content`

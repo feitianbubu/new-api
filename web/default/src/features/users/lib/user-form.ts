@@ -34,6 +34,7 @@ export const userFormSchema = z.object({
   group: z.string().optional(),
   remark: z.string().optional(),
   tpm: z.number().min(0).optional(),
+  api_key: z.boolean().optional(),
 })
 
 export type UserFormValues = z.infer<typeof userFormSchema>
@@ -51,6 +52,7 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   group: DEFAULT_GROUP,
   remark: '',
   tpm: 0,
+  api_key: false,
 }
 
 // ============================================================================
@@ -81,6 +83,7 @@ export function transformFormDataToPayload(
   }
 
   ;(payload as unknown as { tpm: number }).tpm = parseInt(String(data.tpm ?? 0), 10) || 0
+  ;(payload as unknown as { api_key: boolean }).api_key = Boolean(data.api_key)
 
   return payload
 }
@@ -98,5 +101,6 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
     tpm: user.tpm ?? 0,
+    api_key: user.api_key ?? false,
   }
 }

@@ -275,9 +275,9 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	modelName := taskModelName(task)
 
 	// 获取模型价格和倍率
-	modelRatio, hasRatioSetting, _ := ratio_setting.GetModelRatio(modelName)
-	// 只有配置了倍率(非固定价格)时才按 token 重新计费
-	if !hasRatioSetting || modelRatio <= 0 {
+	modelRatio, _, _ := ratio_setting.GetModelRatio(modelName)
+	// 不再依赖 hasRatioSetting，避免 AcceptUnsetRatioModel 场景下任务变相免费
+	if modelRatio <= 0 {
 		return
 	}
 

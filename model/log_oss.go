@@ -475,13 +475,24 @@ func convertClaudeMessagesStreamToJSON(streamData string) (string, error) {
 			}
 			message["content"] = content
 		case "message_delta":
+			if message == nil {
+				message = make(map[string]interface{})
+			}
 			if delta, ok := event["delta"].(map[string]interface{}); ok {
-				if message == nil {
-					message = make(map[string]interface{})
-				}
 				for key, value := range delta {
 					message[key] = value
 				}
+			}
+			// message_delta 的 usage 是累计最终值（output_tokens 等），覆盖 message_start 的初始快照
+			if deltaUsage, ok := event["usage"].(map[string]interface{}); ok {
+				existingUsage, _ := message["usage"].(map[string]interface{})
+				if existingUsage == nil {
+					existingUsage = make(map[string]interface{})
+				}
+				for key, value := range deltaUsage {
+					existingUsage[key] = value
+				}
+				message["usage"] = existingUsage
 			}
 		}
 	}

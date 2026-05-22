@@ -561,6 +561,14 @@ func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Req
 			break
 		}
 		err = errors.New("request is not a RerankRequest")
+	case types.RelayFormatWebSearch:
+		if request, ok := request.(*dto.WebSearchRequest); ok {
+			info = genBaseRelayInfo(c, request)
+			info.RelayFormat = types.RelayFormatWebSearch
+			info.RelayMode = relayconstant.RelayModeWebSearch
+			break
+		}
+		err = errors.New("request is not a WebSearchRequest")
 	case types.RelayFormatGemini:
 		info = GenRelayInfoGemini(c, request)
 	case types.RelayFormatEmbedding:

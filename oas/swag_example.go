@@ -35,3 +35,13 @@ type ExampleRerankRequest struct {
 	Documents []string `json:"documents" example:"[\"文本排序模型广泛用于搜索引擎和推荐系统中\",\"量子计算是计算科学的一个前沿领域\",\"预训练语言模型的发展给文本排序模型带来了新的进展\"]"`
 	TopN      int      `json:"top_n,omitempty" example:"3"`
 }
+
+type ExampleWebSearchRequest struct {
+	Model          string   `json:"model" example:"search_std"`
+	Query          string   `json:"query" example:"今天上海天气"`
+	MaxResults     int      `json:"max_results,omitempty" example:"10"`
+	IncludeDomains []string `json:"include_domains,omitempty" example:"www.example.com"`
+	Recency        string   `json:"recency,omitempty" example:"oneWeek"`
+	ContentSize    string   `json:"content_size,omitempty" example:"medium"`
+	SearchIntent   bool     `json:"search_intent,omitempty" example:"false"`
+}

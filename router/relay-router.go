@@ -140,6 +140,11 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatRerank)
 		})
 
+		// web search related routes
+		httpRouter.POST("/web_search", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatWebSearch)
+		})
+
 		// gemini relay routes
 		httpRouter.POST("/engines/:model/embeddings", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatGemini)

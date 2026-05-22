@@ -14,6 +14,7 @@ const (
 	RelayFormatInteractions                          = "interactions"
 	RelayFormatRerank                                = "rerank"
 	RelayFormatEmbedding                             = "embedding"
+	RelayFormatWebSearch                             = "web_search"
 
 	RelayFormatTask    = "task"
 	RelayFormatMjProxy = "mj_proxy"

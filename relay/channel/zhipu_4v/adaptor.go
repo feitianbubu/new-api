@@ -68,6 +68,11 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 				return fmt.Sprintf("%s/images/generations", specialPlan.OpenAIBaseURL), nil
 			}
 			return fmt.Sprintf("%s/api/paas/v4/images/generations", baseURL), nil
+		case relayconstant.RelayModeWebSearch:
+			if hasSpecialPlan && specialPlan.OpenAIBaseURL != "" {
+				return fmt.Sprintf("%s/web_search", specialPlan.OpenAIBaseURL), nil
+			}
+			return fmt.Sprintf("%s/api/paas/v4/web_search", baseURL), nil
 		default:
 			if hasSpecialPlan && specialPlan.OpenAIBaseURL != "" {
 				return fmt.Sprintf("%s/chat/completions", specialPlan.OpenAIBaseURL), nil
@@ -122,6 +127,16 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		adaptor := openai.Adaptor{}
 		return adaptor.DoResponse(c, resp, info)
 	}
+}
+
+// ConvertWebSearchRequest 实现 channel.WebSearchAdaptor。
+func (a *Adaptor) ConvertWebSearchRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.WebSearchRequest) (any, error) {
+	return convertWebSearchRequest(request), nil
+}
+
+// DoWebSearchResponse 实现 channel.WebSearchAdaptor。
+func (a *Adaptor) DoWebSearchResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.WebSearchResponse, *types.NewAPIError) {
+	return handleWebSearchResponse(c, resp, info)
 }
 
 func (a *Adaptor) GetModelList() []string {

@@ -44,6 +44,8 @@ func GetAndValidateRequest(c *gin.Context, format types.RelayFormat) (request dt
 		request, err = GetAndValidateEmbeddingRequest(c, relayMode)
 	case types.RelayFormatRerank:
 		request, err = GetAndValidateRerankRequest(c)
+	case types.RelayFormatWebSearch:
+		request, err = GetAndValidateWebSearchRequest(c)
 	case types.RelayFormatOpenAIAudio:
 		request, err = GetAndValidAudioRequest(c, relayMode)
 	case types.RelayFormatInteractions:
@@ -90,6 +92,24 @@ func GetAndValidAudioRequest(c *gin.Context, relayMode int) (*dto.AudioRequest, 
 		}
 	}
 	return audioRequest, nil
+}
+
+func GetAndValidateWebSearchRequest(c *gin.Context) (*dto.WebSearchRequest, error) {
+	var wsReq *dto.WebSearchRequest
+	if err := common.UnmarshalBodyReusable(c, &wsReq); err != nil {
+		logger.LogError(c, fmt.Sprintf("getAndValidateWebSearchRequest failed: %s", err.Error()))
+		return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	if wsReq == nil {
+		return nil, types.NewError(errors.New("invalid web search request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	if strings.TrimSpace(wsReq.Query) == "" {
+		return nil, types.NewError(errors.New("query is required"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	if strings.TrimSpace(wsReq.Model) == "" {
+		return nil, types.NewError(errors.New("model is required"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+	return wsReq, nil
 }
 
 func GetAndValidateRerankRequest(c *gin.Context) (*dto.RerankRequest, error) {

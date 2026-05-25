@@ -71,6 +71,7 @@ type responseTask struct {
 	Status  string `json:"status"`
 	Content struct {
 		VideoURL string `json:"video_url"`
+		FileURL  string `json:"file_url"`
 	} `json:"content"`
 	Seed            int    `json:"seed"`
 	Resolution      string `json:"resolution"`
@@ -326,7 +327,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "succeeded":
 		taskResult.Status = model.TaskStatusSuccess
 		taskResult.Progress = "100%"
-		taskResult.Url = resTask.Content.VideoURL
+		taskResult.Url = common.GetStringIfEmpty(resTask.Content.VideoURL, resTask.Content.FileURL)
 		// 解析 usage 信息用于按倍率计费
 		taskResult.CompletionTokens = resTask.Usage.CompletionTokens
 		taskResult.TotalTokens = resTask.Usage.TotalTokens

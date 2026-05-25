@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 
@@ -50,6 +51,11 @@ func applyVideoTaskResultURL(ctx context.Context, task *model.Task, taskResult *
 }
 
 func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (string, error) {
+	ext := extractURLFileExt(videoURL)
+	if ext == "" {
+		ext = ".mp4"
+	}
+
 	req := resty.New().R().
 		SetDoNotParseResponse(true)
 
@@ -76,7 +82,7 @@ func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (stri
 		}
 	}
 
-	filename := fmt.Sprintf("video_%s.mp4", task.TaskID)
+	filename := fmt.Sprintf("video_%s%s", task.TaskID, ext)
 	objectKey := common.GetOSSFileKey(task.Properties.RequestId, filename)
 
 	storageInstance, err := storage.NewStorageFromEnv()
@@ -311,4 +317,16 @@ func ensureAPIKey(uri, key string) string {
 
 func isHTTPURL(videoURL string) bool {
 	return strings.HasPrefix(videoURL, "http")
+}
+
+func extractURLFileExt(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	ext := strings.ToLower(path.Ext(u.Path))
+	if len(ext) < 2 {
+		return ""
+	}
+	return ext
 }

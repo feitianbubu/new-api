@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { type SidebarData } from '@/components/layout/types'
+import { useHasApiKeyPermission } from '@/lib/permissions'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -44,6 +45,7 @@ import { type SidebarData } from '@/components/layout/types'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const canManageApiKeys = useHasApiKeyPermission()
 
   return {
     navGroups: [
@@ -77,11 +79,9 @@ export function useSidebarData(): SidebarData {
             url: '/dashboard/models',
             icon: LayoutDashboard,
           },
-          {
-            title: t('API Keys'),
-            url: '/keys',
-            icon: Key,
-          },
+          ...(canManageApiKeys
+            ? [{ title: t('API Keys'), url: '/keys', icon: Key }]
+            : []),
           {
             title: t('Usage Logs'),
             url: '/usage-logs/common',

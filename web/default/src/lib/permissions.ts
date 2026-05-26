@@ -1,11 +1,16 @@
-import { useAuthStore } from '@/stores/auth-store'
+import { useAuthStore, type AuthUser } from '@/stores/auth-store'
 import { ROLE } from '@/lib/roles'
 
-export function hasApiKeyPermission(): boolean {
-  const user = useAuthStore.getState().auth.user
+function check(user: AuthUser | null | undefined): boolean {
   if (!user) return false
-  if (typeof user.role === 'number' && user.role >= ROLE.ADMIN) {
-    return true
-  }
-  return Boolean((user as unknown as { api_key?: boolean }).api_key)
+  if (user.role >= ROLE.ADMIN) return true
+  return Boolean((user as AuthUser & { api_key?: boolean }).api_key)
+}
+
+export function hasApiKeyPermission(): boolean {
+  return check(useAuthStore.getState().auth.user)
+}
+
+export function useHasApiKeyPermission(): boolean {
+  return useAuthStore((s) => check(s.auth.user))
 }

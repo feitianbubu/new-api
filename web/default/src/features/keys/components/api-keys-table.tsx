@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { type Table as TanstackTable } from '@tanstack/react-table'
+import { hasApiKeyPermission } from '@/lib/permissions'
 import { Database } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -184,6 +185,7 @@ export function ApiKeysTable() {
   const { t } = useTranslation()
   const { refreshTrigger } = useApiKeys()
   const columns = useApiKeysColumns()
+  const canManageApiKeys = hasApiKeyPermission()
 
   const {
     globalFilter,
@@ -256,6 +258,7 @@ export function ApiKeysTable() {
         total: result.data?.total || 0,
       }
     },
+    enabled: canManageApiKeys,
     placeholderData: (previousData) => previousData,
   })
 

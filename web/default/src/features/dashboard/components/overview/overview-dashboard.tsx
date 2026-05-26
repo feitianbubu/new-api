@@ -43,6 +43,7 @@ import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { getUserModels } from '@/lib/api'
 import { MOTION_TRANSITION } from '@/lib/motion'
+import { hasApiKeyPermission } from '@/lib/permissions'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -477,6 +478,7 @@ export function OverviewDashboard() {
       const result = await getApiKeys({ p: 1, size: 10 })
       return result.success ? (result.data?.items ?? []) : []
     },
+    enabled: hasApiKeyPermission(),
     staleTime: 60 * 1000,
   })
 

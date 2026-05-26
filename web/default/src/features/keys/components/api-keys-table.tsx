@@ -31,6 +31,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useDebounce } from '@/hooks'
+import { hasApiKeyPermission } from '@/lib/permissions'
 import { Database } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -192,6 +193,7 @@ export function ApiKeysTable() {
   const { t } = useTranslation()
   const { refreshTrigger } = useApiKeys()
   const columns = useApiKeysColumns()
+  const canManageApiKeys = hasApiKeyPermission()
   const [rowSelection, setRowSelection] = useState({})
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -279,6 +281,7 @@ export function ApiKeysTable() {
         total: result.data?.total || 0,
       }
     },
+    enabled: canManageApiKeys,
     placeholderData: (previousData) => previousData,
   })
 

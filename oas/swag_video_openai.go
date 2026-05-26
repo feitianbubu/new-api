@@ -14,7 +14,8 @@ import (
 // @Description * 可灵: https://app.klingai.com/cn/dev/document-api/apiReference/model/skillsMap
 // @Description * 即梦: https://www.volcengine.com/docs/85621/1792707
 // @Description * 即梦数字人: https://www.volcengine.com/docs/85621/1829013
-// @Description * 豆包: https://www.volcengine.com/docs/82379/1520758
+// @Description * 豆包视频: https://www.volcengine.com/docs/82379/1520758
+// @Description * 豆包3D: https://www.volcengine.com/docs/82379/1856293
 // @Description * Vidu: https://platform.vidu.cn/docs/text-to-video
 // @Description * 海螺: https://platform.minimaxi.com/docs/api-reference/video-generation-intro
 // @Description * Veo: https://ai.google.dev/gemini-api/docs/video

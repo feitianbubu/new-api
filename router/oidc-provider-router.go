@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/QuantumNous/new-api/common/registry"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 
@@ -8,7 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetOIDCProviderRouter(router *gin.Engine) {
+func init() {
+	registry.RegisterRouter(setOIDCProviderRouter)
+}
+
+func setOIDCProviderRouter(router *gin.Engine) {
 	// OIDC Provider 标准端点
 	router.GET("/.well-known/openid-configuration", controller.OIDCWellKnown)
 	router.GET("/.well-known/openid_configuration", controller.OIDCWellKnown)

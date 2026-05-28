@@ -8,16 +8,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type RouterFunc func(*gin.Engine)
+type (
+	RouterFunc func(*gin.Engine)
+	InitFunc   func()
+)
 
 var (
 	mu          sync.Mutex
 	routerFuncs []RouterFunc
+	initFuncs   []InitFunc
 )
 
 func RegisterRouter(f RouterFunc) {
 	mu.Lock()
 	routerFuncs = append(routerFuncs, f)
+	mu.Unlock()
+}
+
+func RegisterInit(f InitFunc) {
+	mu.Lock()
+	initFuncs = append(initFuncs, f)
 	mu.Unlock()
 }
 
@@ -28,5 +38,14 @@ func ApplyRouters(r *gin.Engine) {
 	mu.Unlock()
 	for _, f := range fs {
 		f(r)
+	}
+}
+
+func RunInits() {
+	mu.Lock()
+	fs := append([]InitFunc(nil), initFuncs...)
+	mu.Unlock()
+	for _, f := range fs {
+		f()
 	}
 }

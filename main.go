@@ -52,6 +52,9 @@ var classicBuildFS embed.FS
 //go:embed web/classic/dist/index.html
 var classicIndexPage []byte
 
+// @title    New API
+// @version  {{.Version}}
+// @BasePath /
 func main() {
 	startTime := time.Now()
 

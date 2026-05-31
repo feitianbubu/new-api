@@ -12,7 +12,7 @@ jobs:
 
     permissions:
       packages: write
-      contents: read
+      contents: write
 
     steps:
       - name: Check out
@@ -124,6 +124,7 @@ jobs:
           } > /tmp/docker-ctx/Dockerfile
 
       - name: Build & push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: /tmp/docker-ctx
@@ -137,3 +138,27 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
           sbom: false
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ env.TAG }}
+          prerelease: ${{ contains(env.TAG, '-rc') || contains(env.TAG, '-alpha') || contains(env.TAG, '-beta') }}
+          body: |
+            ## 🐳 Docker 镜像
+
+            已发布到 Docker Hub：[`skynono/new-api`](https://hub.docker.com/r/skynono/new-api/tags)
+
+            ```bash
+            docker pull skynono/new-api:${{ env.TAG }}
+            ```
+
+            | Image Tag | 说明 |
+            | --- | --- |
+            | `skynono/new-api:${{ env.TAG }}` | 本次发布版本 |
+            | `skynono/new-api:latest` | 最新版本 |
+
+            **Digest:** `${{ steps.build.outputs.digest }}`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

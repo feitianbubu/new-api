@@ -159,7 +159,8 @@ const examples = {
 };
 
 try {
-  doc.paths["/v1/chat/completions"].post.requestBody.content["application/json"].examples = examples;
+  const chatJson = doc.paths?.["/v1/chat/completions"]?.post?.requestBody?.content?.["application/json"];
+  if (chatJson) chatJson.examples = examples;
   const responsesJson = doc.paths?.["/v1/responses"]?.post?.requestBody?.content?.["application/json"];
   if (responsesJson) {
     responsesJson.example = {

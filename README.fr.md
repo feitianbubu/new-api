@@ -62,6 +62,12 @@
 
 ---
 
+## 🆕 Fonctionnalités ajoutées
+
+> Ce projet est un développement dérivé (fork) basé sur [New API](https://github.com/QuantumNous/new-api). Pour la liste des fonctionnalités ajoutées par ce fork, consultez le README en [English](./README.md#-enhanced-features) / [简体中文](./README.zh_CN.md#-增强功能).
+
+---
+
 ## 🤝 Partenaires de confiance
 
 <p align="center">

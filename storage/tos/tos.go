@@ -572,14 +572,6 @@ func (t *TOSStorage) PresignURL(_ context.Context, objectKey string, expireSecon
 	return out.SignedUrl, nil
 }
 
-func PresignURLFromEnv(ctx context.Context, objectKey string, expireSeconds int64) (string, error) {
-	tosStorage, err := NewTOSStorageFromEnv()
-	if err != nil {
-		return "", err
-	}
-	return tosStorage.PresignURL(ctx, objectKey, expireSeconds)
-}
-
 func parseContentRange(cr string) (int64, int64, int64, bool) {
 	const prefix = "bytes "
 	if !strings.HasPrefix(cr, prefix) {

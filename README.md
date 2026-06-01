@@ -62,6 +62,39 @@
 
 ---
 
+## 🆕 Enhanced Features
+
+> This is a secondary development (fork) based on [New API](https://github.com/QuantumNous/new-api), with the following added capabilities.
+
+### 🎬 More Models & Multimodal
+- **Video generation**: Kling v3 (multi-image-to-video, sound, watermark, ImageTail / ImageList), Jimeng OmniHuman 1.5, Hailuo S2V-01, Vidu (multi-frame & image)
+- **Audio & 3D**: Doubao ASR 2.0 (speech recognition), Doubao Seed3D output handling (file_url)
+- **Image generation**: Vertex / Gemini (`gemini-3-pro-image-preview`, nano-banana)
+- **Embedding & other models**: Ali Qwen3-VL multimodal embedding, Ali HappyHorse-1.0, Ollama Wiki model
+- **Suno**: official balance query, upload-and-cover-audio action
+- **Search & research**: Zhipu Web Search API (`/v1/web_search`), Gemini Deep Research task
+
+### 📦 Asset & File Storage (OSS)
+- Pluggable storage abstraction with TOS backend
+- File management API, upload worker, OSS path logging and in-console preview
+
+### 🔐 Authentication
+- Built-in **OIDC Provider** (acts as an IdP, with refresh token & JWKS endpoint)
+- OIDC RP integration with post-logout redirect
+- WeChat direct QR login, per-user API key permission control
+
+### 📊 Observability & Ops
+- Prometheus metrics pushed to a Pushgateway (app + node metrics)
+- Request/response body logging, error stack capture, sensitive-data masking
+- Graceful shutdown, auto `GOMEMLIMIT`, DSN encryption, configurable auto-migration & SQL log toggle
+
+### 📝 API Docs & Logs
+- Built-in Swagger / OpenAPI docs (Scalar UI, `/docs` route)
+- Enhanced logs: `client_id`, instance, prompt / completion tokens, task model column
+- Refactored relay task framework with concurrency limits and admin task management
+
+---
+
 ## 🤝 Trusted Partners
 
 <p align="center">

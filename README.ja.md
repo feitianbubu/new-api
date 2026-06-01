@@ -62,6 +62,12 @@
 
 ---
 
+## 🆕 追加機能
+
+> 本プロジェクトは [New API](https://github.com/QuantumNous/new-api) をベースとした二次開発（fork）です。フォークで追加された機能の詳細は [English](./README.md#-enhanced-features) / [简体中文](./README.zh_CN.md#-增强功能) 版の README をご覧ください。
+
+---
+
 ## 🤝 信頼できるパートナー
 
 <p align="center">

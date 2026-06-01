@@ -62,6 +62,39 @@
 
 ---
 
+## 🆕 增强功能
+
+> 本项目是基于 [New API](https://github.com/QuantumNous/new-api) 的二次开发（fork），新增了以下能力。
+
+### 🎬 更多模型与多模态
+- **视频生成**：Kling v3（多图生视频、音效、水印、ImageTail / ImageList）、即梦 OmniHuman 1.5、海螺 S2V-01、Vidu（多帧 & 图像）
+- **语音与 3D**：豆包 ASR 2.0（语音识别）、豆包 Seed3D 输出处理（file_url）
+- **图像生成**：Vertex / Gemini（`gemini-3-pro-image-preview`、nano-banana）
+- **向量与其他模型**：阿里 Qwen3-VL 多模态向量、阿里 HappyHorse-1.0、Ollama Wiki 模型
+- **Suno**：官方余额查询、上传并翻唱音频（upload-and-cover）
+- **搜索与研究**：智谱 Web Search 接口（`/v1/web_search`）、Gemini Deep Research 任务
+
+### 📦 资产与文件存储（OSS）
+- 可插拔的存储抽象层，内置 TOS 后端
+- 文件管理 API、上传 worker、OSS 路径记录与控制台内预览
+
+### 🔐 认证
+- 内置 **OIDC Provider**（作为 IdP，支持 refresh token 与 JWKS 端点）
+- OIDC RP 接入与登出后重定向
+- 微信扫码直接登录、按用户的 API Key 权限控制
+
+### 📊 可观测性与运维
+- Prometheus 指标推送至 Pushgateway（应用 + 节点指标）
+- 请求/响应体日志、错误栈捕获、敏感信息脱敏
+- 优雅关机、自动 `GOMEMLIMIT`、DSN 加密、可配置的自动迁移与 SQL 日志开关
+
+### 📝 API 文档与日志
+- 内置 Swagger / OpenAPI 文档（Scalar UI、`/docs` 路由）
+- 日志增强：`client_id`、实例、prompt / completion tokens、任务模型列
+- 重构的中继任务框架，支持并发限制与管理员任务管理
+
+---
+
 ## 🤝 我们信任的合作伙伴
 
 <p align="center">

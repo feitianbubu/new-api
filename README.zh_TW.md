@@ -62,6 +62,12 @@
 
 ---
 
+## 🆕 增強功能
+
+> 本專案是基於 [New API](https://github.com/QuantumNous/new-api) 的二次開發（fork）。二次開發新增的功能說明請見 [English](./README.md#-enhanced-features) / [简体中文](./README.zh_CN.md#-增强功能) 版本的 README。
+
+---
+
 ## 🤝 我們信任的合作伙伴
 
 <p align="center">

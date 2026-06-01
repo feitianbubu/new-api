@@ -2,6 +2,7 @@ package storage
 
 const (
 	TOSStorage            = "tos-storage"
+	S3Storage             = "s3-storage"
 	DefaultStorageSeconds = 14 * 24 * 60 * 60
 	/*
 		Tos 存储费用:

@@ -20,7 +20,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/storage"
-	tostorage "github.com/QuantumNous/new-api/storage/tos"
 )
 
 func applyVideoTaskResultURL(ctx context.Context, task *model.Task, taskResult *relaycommon.TaskInfo) {
@@ -91,6 +90,11 @@ func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (stri
 	}
 	defer storageInstance.Close()
 
+	presigner, isPresigner := storageInstance.(storage.Presigner)
+	if !isPresigner {
+		return "", fmt.Errorf("storage provider %q does not support presigned URLs", storageInstance.GetModelName())
+	}
+
 	if uploader, ok := storageInstance.(storage.URLUploader); ok && !requiresAuth && isHTTPURL(videoURL) {
 		fileObj, uploadErr := uploader.UploadFileByURL(ctx, videoURL, storage.UploadOptions{
 			Filename:  filename,
@@ -99,13 +103,13 @@ func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (stri
 			UserID:    task.UserId,
 		})
 		if uploadErr == nil {
-			signedURL, err := tostorage.PresignURLFromEnv(ctx, fileObj.Key, 24*60*60)
+			signedURL, err := presigner.PresignURL(ctx, fileObj.Key, 24*60*60)
 			if err != nil {
 				return "", errors.Wrap(err, "generate presigned url failed")
 			}
 			return signedURL, nil
 		}
-		logger.LogWarn(ctx, fmt.Sprintf("TOS url fetch failed, falling back to download upload: %v", uploadErr))
+		logger.LogWarn(ctx, fmt.Sprintf("storage url fetch failed, falling back to download upload: %v", uploadErr))
 	}
 
 	resp, err := req.Get(videoURL)
@@ -160,7 +164,7 @@ func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (stri
 		return "", errors.Wrap(err, "upload video to storage failed")
 	}
 
-	signedURL, err := tostorage.PresignURLFromEnv(ctx, fileObj.Key, 24*60*60)
+	signedURL, err := presigner.PresignURL(ctx, fileObj.Key, 24*60*60)
 	if err != nil {
 		return "", errors.Wrap(err, "generate presigned url failed")
 	}

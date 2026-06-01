@@ -25,6 +25,10 @@ type URLUploader interface {
 	UploadFileByURL(ctx context.Context, sourceURL string, opts UploadOptions) (*FileObject, error)
 }
 
+type Presigner interface {
+	PresignURL(ctx context.Context, objectKey string, expireSeconds int64) (string, error)
+}
+
 type Config struct {
 	// Storage provider type: "tos", "s3", "oss", etc.
 	Provider string `json:"provider"`

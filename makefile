@@ -2,6 +2,8 @@ FRONTEND_DIR = ./web/default
 FRONTEND_CLASSIC_DIR = ./web/classic
 SWAG_FRONTEND_DIR ?= $(FRONTEND_CLASSIC_DIR)
 SWAG_DIST_DIR = $(SWAG_FRONTEND_DIR)/dist/swag
+# 不进 package.json(swag 时从 CDN 取),以保持 bun.lock 与上游一致、避免 rebase 冲突
+SCALAR_API_REFERENCE_VERSION ?= 1.40.9
 BACKEND_DIR = .
 DEV_FRONTEND_DEFAULT_PORT ?= 5173
 DEV_FRONTEND_CLASSIC_PORT ?= 5174
@@ -33,6 +35,7 @@ build-frontend-classic:
 	@echo "Building classic frontend..."
 	@cd ./web && bun install --frozen-lockfile
 	@cd $(FRONTEND_CLASSIC_DIR) && VITE_REACT_APP_VERSION=$(cat ../../VERSION) bun run build
+	@$(MAKE) swag
 
 build-all-frontends: build-frontend build-frontend-classic
 
@@ -90,8 +93,8 @@ swag:
 	@bun scripts/patch_openapi.js $(SWAG_DIST_DIR)/openapi3.json
 	@bun scripts/patch_image_generation_openapi.js $(SWAG_DIST_DIR)/openapi3.json
 	@bun scripts/patch_audio.js $(SWAG_DIST_DIR)/openapi3.json
-	@echo "Copying Scalar API Reference..."
-	@cp $(SWAG_FRONTEND_DIR)/node_modules/@scalar/api-reference/dist/browser/standalone.js $(SWAG_DIST_DIR)/api-reference
+	@echo "Downloading Scalar API Reference standalone bundle (v$(SCALAR_API_REFERENCE_VERSION))..."
+	@curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused "https://cdn.jsdelivr.net/npm/@scalar/api-reference@$(SCALAR_API_REFERENCE_VERSION)/dist/browser/standalone.js" -o $(SWAG_DIST_DIR)/api-reference
 	@echo "Mirroring swag/ to default theme dist..."
 	@rm -rf $(FRONTEND_DIR)/dist/swag
 	@mkdir -p $(FRONTEND_DIR)/dist

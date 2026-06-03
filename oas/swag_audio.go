@@ -5,7 +5,8 @@ package oas
 // @Description 将音频文件转录为文字(ASR)
 // @Description
 // @Description * OpenAI: https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create
-// @Description * 豆包语音识别2.0: https://www.volcengine.com/docs/6561/1354868
+// @Description * 豆包ASR: https://www.volcengine.com/docs/6561/1354868
+// @Description * 阿里ASR: https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference
 // @Description
 // @Description **示例**:
 // @Description ```bash

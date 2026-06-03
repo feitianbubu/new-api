@@ -36,6 +36,7 @@ func AudioTranscriptions() {
 // @Description * OpenAI: https://platform.openai.com/docs/guides/text-to-speech
 // @Description * 豆包语音: https://www.volcengine.com/docs/6561/1257584
 // @Description * 豆包音色: https://www.volcengine.com/docs/6561/1257544
+// @Description * MiniMax 语音: https://platform.minimax.io/docs/api-reference/speech-t2a-http
 // @Description
 // @Description **示例**:
 // @Description ```json

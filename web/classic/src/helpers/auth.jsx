@@ -33,6 +33,14 @@ export function authHeader() {
 }
 
 export const AuthRedirect = ({ children }) => {
+  // OIDC 强制重新认证（IdP 下发 reauth=1）：清除本地登录态并停在登录页，
+  // 不要因仍持有 user 而自动跳转，否则会与后端形成死循环。
+  const forceReauth = new URLSearchParams(window.location.search).get('reauth');
+  if (forceReauth) {
+    localStorage.removeItem('user');
+    return children;
+  }
+
   const user = localStorage.getItem('user');
 
   if (user) {

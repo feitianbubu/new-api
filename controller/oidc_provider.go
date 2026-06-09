@@ -125,6 +125,7 @@ func OIDCAuthorize(c *gin.Context) {
 	scope := c.Query("scope")
 	state := c.Query("state")
 	nonce := c.Query("nonce")
+	prompt := c.Query("prompt")
 
 	// 验证必需参数
 	if responseType != "code" {
@@ -192,8 +193,17 @@ func OIDCAuthorize(c *gin.Context) {
 	// 检查用户是否已登录
 	session := sessions.Default(c)
 	username := session.Get("username")
-	if username == nil {
-		// 用户未登录，重定向到登录页面
+
+	// OIDC 标准 prompt=login/select_account：即使已登录也必须重新认证。
+	// 清除当前 IdP 会话，并在登录 URL 附加 reauth=1，提示前端清除本地登录态并停在
+	// 登录页，避免前端因仍持有登录态而自动 bounce 回授权端点造成死循环。
+	forceReauth := (prompt == "login" || prompt == "select_account") && username != nil
+	if forceReauth {
+		session.Clear()
+	}
+
+	if forceReauth || username == nil {
+		// 用户未登录（或被 prompt 要求强制重新认证），重定向到登录页面
 		// 可以存储授权信息到session中，登录后继续
 		oauthData := map[string]interface{}{
 			"client_id":    clientID,
@@ -212,9 +222,15 @@ func OIDCAuthorize(c *gin.Context) {
 			return
 		}
 
-		// 重定向到登录页面
-		loginURL := "/login?redirect=" + url.QueryEscape(c.Request.URL.String())
-		c.Redirect(http.StatusFound, loginURL)
+		// 重定向到登录页面（按主题映射 /login→各主题登录路由；用 url.Values 拼接，与下方回调 URL 构造方式一致）
+		loginURL, _ := url.Parse(common.ThemeAwarePath("/login"))
+		params := loginURL.Query()
+		params.Set("redirect", c.Request.URL.String())
+		if forceReauth {
+			params.Set("reauth", "1")
+		}
+		loginURL.RawQuery = params.Encode()
+		c.Redirect(http.StatusFound, loginURL.String())
 		return
 	}
 

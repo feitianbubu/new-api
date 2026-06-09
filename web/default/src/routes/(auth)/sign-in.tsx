@@ -23,6 +23,7 @@ import { SignIn } from '@/features/auth/sign-in'
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
+  reauth: z.string().optional(),
 })
 
 export const Route = createFileRoute('/(auth)/sign-in')({
@@ -30,6 +31,13 @@ export const Route = createFileRoute('/(auth)/sign-in')({
   validateSearch: searchSchema,
   beforeLoad: async ({ search }) => {
     const { auth } = useAuthStore.getState()
+
+    // OIDC 强制重新认证（IdP 下发 reauth=1）：清除本地登录态并停在登录页，
+    // 不要因仍持有 auth.user 而自动跳转回授权地址，否则会与后端形成死循环。
+    if (search?.reauth) {
+      auth.reset()
+      return
+    }
 
     // 如果已经有用户信息，说明已登录
     if (auth.user) {

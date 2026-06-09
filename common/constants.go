@@ -38,7 +38,7 @@ func SetTheme(t string) {
 	}
 }
 
-// ThemeAwarePath rewrites legacy /console/* paths to the default-theme
+// ThemeAwarePath rewrites canonical paths (/console/*, /login) to the default-theme
 // equivalents when the active theme is "default".  For "classic" (or any
 // other theme) the path is returned unchanged.  The function only touches
 // known prefixes so it is safe to call with arbitrary suffixes and query
@@ -52,6 +52,8 @@ func ThemeAwarePath(suffix string) string {
 		return strings.Replace(suffix, "/console/topup", "/wallet", 1)
 	case strings.HasPrefix(suffix, "/console/log"):
 		return strings.Replace(suffix, "/console/log", "/usage-logs", 1)
+	case strings.HasPrefix(suffix, "/login"):
+		return strings.Replace(suffix, "/login", "/sign-in", 1)
 	case strings.HasPrefix(suffix, "/console/personal"):
 		return strings.Replace(suffix, "/console/personal", "/profile", 1)
 	}

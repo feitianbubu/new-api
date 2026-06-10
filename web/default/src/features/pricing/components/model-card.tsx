@@ -82,7 +82,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
 
   const primaryGroup = groups[0]
   const createdDate = props.model.created_time && props.model.created_time > 0 ? formatTimestampToDate(props.model.created_time).slice(0, 10) : null
-  const bottomTags = [createdDate, ...endpoints.slice(0, 2), ...tags.slice(0, 2),].filter((item): item is string => Boolean(item))
+  const bottomTags = [...endpoints.slice(0, 2), ...tags.slice(0, 2)].filter((item): item is string => Boolean(item))
   const hiddenCount =
     Math.max(groups.length - 1, 0) +
     Math.max(endpoints.length - 2, 0) +
@@ -230,6 +230,11 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
 
       {/* Description */}
       <p className='text-muted-foreground mt-2 line-clamp-1 flex-1 text-[13px] leading-relaxed sm:mt-4 sm:line-clamp-2 sm:min-h-[2.5rem]'>
+        {createdDate && (
+          <span className='bg-muted text-muted-foreground mr-1.5 rounded px-1.5 py-px font-mono text-[11px] whitespace-nowrap'>
+            {createdDate}
+          </span>
+        )}
         {props.model.description || t('No description available.')}
       </p>
 

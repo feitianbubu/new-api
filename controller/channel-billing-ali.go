@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 type AliQueryAccountBalanceResponse struct {
@@ -104,6 +105,10 @@ func updateChannelAliBalance(channel *model.Channel) (float64, error) {
 	balance, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
 		return 0, err
+	}
+	// 阿里余额按人民币计价，按汇率折算成美元存储
+	if resp.Data.Currency == "CNY" {
+		balance = balance / operation_setting.USDExchangeRate
 	}
 	channel.UpdateBalance(balance)
 	return balance, nil

@@ -17,8 +17,6 @@ type Storage interface {
 	GetFileContent(ctx context.Context, fileID string) (*FileContent, error)
 
 	GetModelName() string
-
-	Close() error
 }
 
 type URLUploader interface {

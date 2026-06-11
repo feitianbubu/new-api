@@ -35,7 +35,6 @@ func UploadMultipartFile(c *gin.Context, file *multipart.FileHeader, userID int,
 	if err != nil {
 		return "", fmt.Errorf("failed to create storage instance: %w", err)
 	}
-	defer storageInstance.Close()
 
 	contentType := file.Header.Get("Content-Type")
 	if contentType == "" {
@@ -91,7 +90,6 @@ func UploadBase64Image(c *gin.Context, base64Data string, filename string, userI
 	if err != nil {
 		return "", fmt.Errorf("failed to create storage instance: %w", err)
 	}
-	defer storageInstance.Close()
 
 	contentType := DetectImageMimeType(filename)
 

@@ -285,10 +285,6 @@ func (s *S3Storage) GetFileContent(ctx context.Context, fileID string) (*FileCon
 	}, nil
 }
 
-func (s *S3Storage) Close() error {
-	return nil
-}
-
 func (s *S3Storage) PresignURL(ctx context.Context, objectKey string, expireSeconds int64) (string, error) {
 	if expireSeconds <= 0 {
 		expireSeconds = DefaultStorageSeconds

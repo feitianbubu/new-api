@@ -88,7 +88,6 @@ func uploadVideoOss(ctx context.Context, task model.Task, videoURL string) (stri
 	if err != nil {
 		return "", errors.Wrap(err, "init storage failed")
 	}
-	defer storageInstance.Close()
 
 	presigner, isPresigner := storageInstance.(storage.Presigner)
 	if !isPresigner {

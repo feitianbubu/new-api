@@ -118,7 +118,6 @@ func Upload(c *gin.Context) {
 		FailFileError(c, http.StatusInternalServerError, "internal_error", "storage_init_failed", "failed to initialize storage")
 		return
 	}
-	defer storageInstance.Close()
 
 	// Upload file
 	fileObj, err := storageInstance.UploadFile(c, file, header.Size, storage.UploadOptions{
@@ -316,7 +315,6 @@ func ListFiles(c *gin.Context) {
 		FailFileError(c, http.StatusInternalServerError, "internal_error", "storage_init_failed", "failed to initialize storage")
 		return
 	}
-	defer storageInstance.Close()
 
 	// List files
 	result, err := storageInstance.ListFiles(c, listOpts)
@@ -388,7 +386,6 @@ func GetFileInfo(c *gin.Context) {
 		FailFileError(c, http.StatusInternalServerError, "internal_error", "storage_init_failed", "failed to initialize storage")
 		return
 	}
-	defer storageInstance.Close()
 
 	// Get file info
 	fileObj, err := storageInstance.GetFileInfo(c, fileID)
@@ -450,7 +447,6 @@ func DeleteFile(c *gin.Context) {
 		FailFileError(c, http.StatusInternalServerError, "internal_error", "storage_init_failed", "failed to initialize storage")
 		return
 	}
-	defer storageInstance.Close()
 
 	// Delete file
 	err = storageInstance.DeleteFile(c, fileID)
@@ -500,7 +496,6 @@ func GetFileContent(c *gin.Context) {
 		FailFileError(c, http.StatusInternalServerError, "internal_error", "storage_init_failed", "failed to initialize storage")
 		return
 	}
-	defer storageInstance.Close()
 
 	fileContent, err := storageInstance.GetFileContent(c, fileID)
 	if err != nil {

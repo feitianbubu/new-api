@@ -552,10 +552,6 @@ func (t *TOSStorage) GetFileContent(ctx context.Context, fileID string) (*FileCo
 	}, nil
 }
 
-func (t *TOSStorage) Close() error {
-	return nil
-}
-
 func (t *TOSStorage) PresignURL(_ context.Context, objectKey string, expireSeconds int64) (string, error) {
 	if expireSeconds <= 0 {
 		expireSeconds = int64(DefaultStorageSeconds)

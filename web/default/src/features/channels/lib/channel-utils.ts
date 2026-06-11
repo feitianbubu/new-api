@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { formatCurrencyFromUSD, formatQuotaWithCurrency } from '@/lib/currency'
+import {
+  formatCurrencyFromUSD,
+  formatQuotaWithCurrency,
+  getCurrencyDisplay,
+} from '@/lib/currency'
 import { formatTimestampToDate } from '@/lib/format'
 
 import {
@@ -333,6 +337,25 @@ export function formatBalance(balance: number | null | undefined): string {
     digitsSmall: 4,
     abbreviate: false,
   })
+}
+
+function balanceDisplayRate(): number {
+  const { config, meta } = getCurrencyDisplay()
+  return meta.kind === 'tokens' ? config.quotaPerUnit : meta.exchangeRate
+}
+
+/**
+ * Convert a stored USD balance to the configured display currency value
+ */
+export function balanceUsdToDisplay(usd: number): number {
+  return Number((usd * balanceDisplayRate()).toFixed(6))
+}
+
+/**
+ * Convert a display currency balance back to USD for storage
+ */
+export function balanceDisplayToUsd(display: number): number {
+  return display / balanceDisplayRate()
 }
 
 /**

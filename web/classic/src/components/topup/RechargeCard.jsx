@@ -68,7 +68,7 @@ const RechargeCard = ({
   topUpCount,
   minTopUp,
   renderQuotaWithAmount,
-  getAmount,
+  previewAmount,
   setTopUpCount,
   setSelectedPreset,
   renderAmount,
@@ -108,6 +108,11 @@ const RechargeCard = ({
   const shouldShowSubscription =
     !subscriptionLoading && subscriptionPlans.length > 0;
   const regularPayMethods = payMethods || [];
+
+  const sliderMax =
+    presetAmounts.length > 0
+      ? Math.max(minTopUp, ...presetAmounts.map((preset) => preset.value))
+      : minTopUp * 500;
 
   useEffect(() => {
     if (initialTabSetRef.current) return;
@@ -246,7 +251,7 @@ const RechargeCard = ({
                 enableWaffoPancakeTopUp) && (
                 <Row gutter={12}>
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>
-                    <Form.InputNumber
+                    <Form.Slider
                       field='topUpCount'
                       label={t('充值数量')}
                       disabled={
@@ -255,32 +260,16 @@ const RechargeCard = ({
                         !enableWaffoTopUp &&
                         !enableWaffoPancakeTopUp
                       }
-                      placeholder={
-                        t('充值数量，最低 ') + renderQuotaWithAmount(minTopUp)
-                      }
-                      value={topUpCount}
                       min={minTopUp}
-                      max={999999999}
+                      max={sliderMax}
+                      // 以系统计价单位为步长，避免货币换算取整问题
                       step={1}
-                      precision={0}
-                      onChange={async (value) => {
-                        if (value && value >= 1) {
-                          setTopUpCount(value);
-                          setSelectedPreset(null);
-                          await getAmount(value);
-                        }
+                      tipFormatter={renderQuotaWithAmount}
+                      onChange={(value) => {
+                        setTopUpCount(value);
+                        setSelectedPreset(null);
+                        previewAmount(value);
                       }}
-                      onBlur={(e) => {
-                        const value = parseInt(e.target.value);
-                        if (!value || value < 1) {
-                          setTopUpCount(1);
-                          getAmount(1);
-                        }
-                      }}
-                      formatter={(value) => (value ? `${value}` : '')}
-                      parser={(value) =>
-                        value ? parseInt(value.replace(/[^\d]/g, '')) : 0
-                      }
                       extraText={
                         <Skeleton
                           loading={showAmountSkeleton}

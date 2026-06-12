@@ -30,7 +30,11 @@ import {
   stringifyAdvancedCustomConfig,
   validateAdvancedCustomConfig,
 } from './advanced-custom'
-import { balanceDisplayToUsd, balanceUsdToDisplay } from './channel-utils'
+import {
+  balanceDisplayToUsd,
+  balanceUsdToDisplay,
+  channelLiveBalanceUsd,
+} from './channel-utils'
 
 // ============================================================================
 // Form Validation Schema
@@ -448,7 +452,7 @@ export function transformChannelToFormDefaults(
     model_mapping: channel.model_mapping || '',
     priority: channel.priority || 0,
     weight: channel.weight || 0,
-    balance: balanceUsdToDisplay(channel.balance || 0),
+    balance: balanceUsdToDisplay(channelLiveBalanceUsd(channel)),
     test_model: channel.test_model || '',
     auto_ban: channel.auto_ban ?? 1,
     status: channel.status,

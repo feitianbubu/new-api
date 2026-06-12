@@ -55,6 +55,7 @@ import { getCodexUsage } from '../api'
 import { CHANNEL_STATUS_CONFIG, MODEL_FETCHABLE_TYPES } from '../constants'
 import {
   channelLiveBalanceUsd,
+  estimateChannelDaysRemaining,
   formatBalance,
   formatRelativeTime,
   formatResponseTime,
@@ -73,7 +74,7 @@ import {
   type TagRow,
 } from '../lib'
 import { parseUpstreamUpdateMeta } from '../lib/upstream-update-utils'
-import type { Channel } from '../types'
+import type { Channel, ChannelRecentUsage } from '../types'
 import { useChannels } from './channels-provider'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DataTableTagRowActions } from './data-table-tag-row-actions'
@@ -270,11 +271,21 @@ function WeightCell({ channel }: { channel: Channel }) {
 /**
  * Balance cell component with click to update
  */
-function BalanceCell({ channel }: { channel: Channel }) {
+function BalanceCell({
+  channel,
+  recentUsage,
+}: {
+  channel: Channel
+  recentUsage?: Record<string, ChannelRecentUsage>
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const isTagRow = isTagAggregateRow(channel)
   const balance = channelLiveBalanceUsd(channel)
+  const usage = recentUsage?.[String(channel.id)]
+  const daysRemaining = estimateChannelDaysRemaining(channel, usage)
+  // map present but no entry => no consume logs within the lookback window
+  const noRecentUsage = recentUsage != null && usage == null
   const usedQuota = channel.used_quota || 0
   const [isUpdating, setIsUpdating] = useState(false)
   const [codexUsageOpen, setCodexUsageOpen] = useState(false)
@@ -388,6 +399,21 @@ function BalanceCell({ channel }: { channel: Channel }) {
             {channel.type !== 57 && <p>{t('Click to update balance')}</p>}
           </TooltipContent>
         </Tooltip>
+        {daysRemaining != null ? (
+          <span className='text-muted-foreground text-xs whitespace-nowrap'>
+            {daysRemaining < 1
+              ? t('Less than 1 day left')
+              : daysRemaining > 999
+                ? t('More than 999 days left')
+                : t('About {{days}} days left', {
+                    days: Math.round(daysRemaining),
+                  })}
+          </span>
+        ) : noRecentUsage ? (
+          <span className='text-muted-foreground text-xs whitespace-nowrap'>
+            {t('No recent usage')}
+          </span>
+        ) : null}
       </div>
 
       <CodexUsageDialog
@@ -424,7 +450,9 @@ function BalanceCell({ channel }: { channel: Channel }) {
 /**
  * Generate channels columns configuration
  */
-export function useChannelsColumns(): ColumnDef<Channel>[] {
+export function useChannelsColumns(
+  recentUsage?: Record<string, ChannelRecentUsage>
+): ColumnDef<Channel>[] {
   const { t } = useTranslation()
   return [
     // Checkbox column
@@ -925,7 +953,9 @@ export function useChannelsColumns(): ColumnDef<Channel>[] {
     {
       accessorKey: 'balance',
       header: t('Used / Remaining'),
-      cell: ({ row }) => <BalanceCell channel={row.original} />,
+      cell: ({ row }) => (
+        <BalanceCell channel={row.original} recentUsage={recentUsage} />
+      ),
       size: 180,
     },
 

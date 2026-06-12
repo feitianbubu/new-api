@@ -112,6 +112,11 @@ export interface ChannelOtherSettings {
 // API Response Types
 // ============================================================================
 
+export interface ChannelRecentUsage {
+  quota: number
+  active_days: number
+}
+
 export interface GetChannelsResponse {
   success: boolean
   message?: string
@@ -121,6 +126,7 @@ export interface GetChannelsResponse {
     page: number
     page_size: number
     type_counts?: Record<string, number>
+    recent_usage?: Record<string, ChannelRecentUsage>
   }
 }
 
@@ -131,6 +137,7 @@ export interface SearchChannelsResponse {
     items: Channel[]
     total: number
     type_counts?: Record<string, number>
+    recent_usage?: Record<string, ChannelRecentUsage>
   }
 }
 

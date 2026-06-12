@@ -256,7 +256,7 @@ export function ChannelsTable() {
   const typeCounts = data?.data?.type_counts
 
   // Columns configuration
-  const columns = useChannelsColumns()
+  const columns = useChannelsColumns(data?.data?.recent_usage)
 
   // React Table instance
   const { table } = useDataTable({

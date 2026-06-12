@@ -701,6 +701,12 @@ type ChannelRecentUsage struct {
 	ActiveDays int   `json:"active_days"`
 }
 
+// Shared window for days-remaining estimates (channel table and balance alert).
+const (
+	ChannelRecentUsageActiveDays   = 7
+	ChannelRecentUsageLookbackDays = 90 // never scan logs older than this
+)
+
 // GetChannelsRecentUsage returns, per channel, the consumed quota summed over
 // its most recent maxActiveDays UTC days that had consumption, looking back no
 // further than the since timestamp.

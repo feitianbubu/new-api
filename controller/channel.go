@@ -89,11 +89,6 @@ func buildChannelListQuery(group string, statusFilter int, typeFilter int) *gorm
 	return query
 }
 
-const (
-	channelRecentUsageActiveDays   = 7
-	channelRecentUsageLookbackDays = 90 // never scan logs older than this
-)
-
 // getChannelsRecentUsage returns recent consumption stats for the given
 // channels, or nil when the stats query fails (the estimate is decorative, so
 // the channel list must still render).
@@ -102,8 +97,8 @@ func getChannelsRecentUsage(channels []*model.Channel) map[int]model.ChannelRece
 	for _, channel := range channels {
 		channelIds = append(channelIds, channel.Id)
 	}
-	since := common.GetTimestamp() - channelRecentUsageLookbackDays*86400
-	usageMap, err := model.GetChannelsRecentUsage(channelIds, since, channelRecentUsageActiveDays)
+	since := common.GetTimestamp() - model.ChannelRecentUsageLookbackDays*86400
+	usageMap, err := model.GetChannelsRecentUsage(channelIds, since, model.ChannelRecentUsageActiveDays)
 	if err != nil {
 		common.SysError("failed to query channels recent usage: " + err.Error())
 		return nil

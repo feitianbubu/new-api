@@ -95,6 +95,28 @@ func GetChannelOps(c *gin.Context) {
 	})
 }
 
+const (
+	channelRecentUsageActiveDays   = 7
+	channelRecentUsageLookbackDays = 90 // never scan logs older than this
+)
+
+// getChannelsRecentUsage returns recent consumption stats for the given
+// channels, or nil when the stats query fails (the estimate is decorative, so
+// the channel list must still render).
+func getChannelsRecentUsage(channels []*model.Channel) map[int]model.ChannelRecentUsage {
+	channelIds := make([]int, 0, len(channels))
+	for _, channel := range channels {
+		channelIds = append(channelIds, channel.Id)
+	}
+	since := common.GetTimestamp() - channelRecentUsageLookbackDays*86400
+	usageMap, err := model.GetChannelsRecentUsage(channelIds, since, channelRecentUsageActiveDays)
+	if err != nil {
+		common.SysError("failed to query channels recent usage: " + err.Error())
+		return nil
+	}
+	return usageMap
+}
+
 func GetAllChannels(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	channelData := make([]*model.Channel, 0)
@@ -182,11 +204,12 @@ func GetAllChannels(c *gin.Context) {
 		typeCounts[r.Type] = r.Count
 	}
 	common.ApiSuccess(c, gin.H{
-		"items":       channelData,
-		"total":       total,
-		"page":        pageInfo.GetPage(),
-		"page_size":   pageInfo.GetPageSize(),
-		"type_counts": typeCounts,
+		"items":        channelData,
+		"total":        total,
+		"page":         pageInfo.GetPage(),
+		"page_size":    pageInfo.GetPageSize(),
+		"type_counts":  typeCounts,
+		"recent_usage": getChannelsRecentUsage(channelData),
 	})
 }
 
@@ -376,9 +399,10 @@ func SearchChannels(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data": gin.H{
-			"items":       pagedData,
-			"total":       total,
-			"type_counts": typeCounts,
+			"items":        pagedData,
+			"total":        total,
+			"type_counts":  typeCounts,
+			"recent_usage": getChannelsRecentUsage(pagedData),
 		},
 	})
 }

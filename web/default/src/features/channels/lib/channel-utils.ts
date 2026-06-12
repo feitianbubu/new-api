@@ -31,7 +31,12 @@ import {
   RESPONSE_TIME_THRESHOLDS,
   TYPE_TO_KEY_PROMPT,
 } from '../constants'
-import type { Channel, ChannelSettings, ChannelOtherSettings } from '../types'
+import type {
+  Channel,
+  ChannelRecentUsage,
+  ChannelSettings,
+  ChannelOtherSettings,
+} from '../types'
 
 // ============================================================================
 // Channel Type Utilities
@@ -373,6 +378,23 @@ export function channelLiveBalanceUsd(channel: {
   if (snapshot == null) return balance
   const { config } = getCurrencyDisplay()
   return balance - ((channel.used_quota || 0) - snapshot) / config.quotaPerUnit
+}
+
+/**
+ * Days until the live remaining balance runs out at the channel's average
+ * daily consumption over its recent active days. Null when not computable.
+ */
+export function estimateChannelDaysRemaining(
+  channel: Parameters<typeof channelLiveBalanceUsd>[0],
+  usage: ChannelRecentUsage | undefined
+): number | null {
+  if (!usage || usage.quota <= 0) return null
+  const liveBalance = channelLiveBalanceUsd(channel)
+  if (liveBalance <= 0) return null
+  const { config } = getCurrencyDisplay()
+  const avgDailyUsd =
+    usage.quota / Math.max(usage.active_days, 1) / config.quotaPerUnit
+  return liveBalance / avgDailyUsd
 }
 
 /**

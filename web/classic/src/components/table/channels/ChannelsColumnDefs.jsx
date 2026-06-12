@@ -45,6 +45,10 @@ import {
 } from '../../../constants';
 import { parseUpstreamUpdateMeta } from '../../../hooks/channels/upstreamUpdateUtils';
 import {
+  channelLiveBalanceUsd,
+  estimateChannelDaysRemaining,
+} from '../../../hooks/channels/channelBalanceUtils';
+import {
   IconTreeTriangleDown,
   IconMore,
   IconAlertTriangle,
@@ -253,6 +257,19 @@ const renderResponseTime = (responseTime, t) => {
   }
 };
 
+const renderDaysHint = (daysRemaining, noRecentUsage, t) => {
+  if (daysRemaining == null) {
+    return noRecentUsage ? t('暂无使用记录') : null;
+  }
+  if (daysRemaining < 1) {
+    return t('剩余不足 1 天');
+  }
+  if (daysRemaining > 999) {
+    return t('剩余超过 999 天');
+  }
+  return t('约剩 {{days}} 天', { days: Math.round(daysRemaining) });
+};
+
 const isRequestPassThroughEnabled = (record) => {
   if (!record || record.children !== undefined) {
     return false;
@@ -327,6 +344,7 @@ export const getChannelsColumns = ({
   setCurrentMultiKeyChannel,
   openUpstreamUpdateModal,
   detectChannelUpstreamUpdates,
+  recentUsage,
 }) => {
   return [
     {
@@ -528,6 +546,17 @@ export const getChannelsColumns = ({
       dataIndex: 'expired_time',
       render: (text, record, index) => {
         if (record.children === undefined) {
+          const liveBalance = channelLiveBalanceUsd(record);
+          const usage = recentUsage?.[record.id];
+          const daysRemaining = estimateChannelDaysRemaining(
+            liveBalance,
+            usage,
+          );
+          const daysHint = renderDaysHint(
+            daysRemaining,
+            recentUsage != null && usage == null,
+            t,
+          );
           return (
             <div>
               <Space spacing={1}>
@@ -542,7 +571,7 @@ export const getChannelsColumns = ({
                       ? t('查看 Codex 帐号信息与用量')
                       : t('剩余额度') +
                         ': ' +
-                        renderQuotaWithAmount(record.balance) +
+                        renderQuotaWithAmount(liveBalance) +
                         t('，点击更新')
                   }
                 >
@@ -555,9 +584,18 @@ export const getChannelsColumns = ({
                   >
                     {record.type === 57
                       ? t('帐号信息')
-                      : renderQuotaWithAmount(record.balance)}
+                      : renderQuotaWithAmount(liveBalance)}
                   </Tag>
                 </Tooltip>
+                {daysHint && (
+                  <Typography.Text
+                    type='tertiary'
+                    size='small'
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {daysHint}
+                  </Typography.Text>
+                )}
               </Space>
             </div>
           );

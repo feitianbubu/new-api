@@ -79,6 +79,8 @@ export const useChannelsData = () => {
   const [activeTypeKey, setActiveTypeKey] = useState('all');
   const [typeCounts, setTypeCounts] = useState({});
 
+  const [recentUsage, setRecentUsage] = useState(null);
+
   // Model test states
   const [showModelTestModal, setShowModelTestModal] = useState(false);
   const [currentTestChannel, setCurrentTestChannel] = useState(null);
@@ -356,7 +358,7 @@ export const useChannelsData = () => {
 
     const { success, message, data } = res.data;
     if (success) {
-      const { items, total, type_counts } = data;
+      const { items, total, type_counts, recent_usage } = data;
       if (type_counts) {
         const sumAll = Object.values(type_counts).reduce(
           (acc, v) => acc + v,
@@ -364,6 +366,7 @@ export const useChannelsData = () => {
         );
         setTypeCounts({ ...type_counts, all: sumAll });
       }
+      setRecentUsage(recent_usage || null);
       setChannelFormat(items, enableTagMode);
       setChannelCount(total);
     } else {
@@ -403,12 +406,13 @@ export const useChannelsData = () => {
       );
       const { success, message, data } = res.data;
       if (success) {
-        const { items = [], total = 0, type_counts = {} } = data;
+        const { items = [], total = 0, type_counts = {}, recent_usage } = data;
         const sumAll = Object.values(type_counts).reduce(
           (acc, v) => acc + v,
           0,
         );
         setTypeCounts({ ...type_counts, all: sumAll });
+        setRecentUsage(recent_usage || null);
         setChannelFormat(items, enableTagMode);
         setChannelCount(total);
         setActivePage(page);
@@ -772,6 +776,8 @@ export const useChannelsData = () => {
     if (success) {
       updateChannelProperty(record.id, (channel) => {
         channel.balance = balance;
+        // backend re-stamps balance_snapshot = used_quota on balance refresh
+        channel.balance_snapshot = channel.used_quota;
         channel.balance_updated_time = Date.now() / 1000;
       });
       showInfo(
@@ -1177,6 +1183,7 @@ export const useChannelsData = () => {
     typeCounts,
     channelTypeCounts,
     availableTypeKeys,
+    recentUsage,
 
     // Model test states
     showModelTestModal,

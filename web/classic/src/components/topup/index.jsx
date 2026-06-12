@@ -878,15 +878,17 @@ const TopUp = () => {
     setSelectedCreemProduct(null);
   };
 
+  // 本地估算实付金额；支付前 preTopUp 仍会从后端获取权威金额
+  const previewAmount = (value, discountOverride) => {
+    const discount = discountOverride || topupInfo.discount[value] || 1.0;
+    setAmount(value * priceRatio * discount);
+  };
+
   // 选择预设充值额度
   const selectPresetAmount = (preset) => {
     setTopUpCount(preset.value);
     setSelectedPreset(preset.value);
-
-    // 计算实际支付金额，考虑折扣
-    const discount = preset.discount || topupInfo.discount[preset.value] || 1.0;
-    const discountedAmount = preset.value * priceRatio * discount;
-    setAmount(discountedAmount);
+    previewAmount(preset.value, preset.discount);
   };
 
   // 格式化大数字显示
@@ -988,7 +990,7 @@ const TopUp = () => {
           topUpCount={topUpCount}
           minTopUp={minTopUp}
           renderQuotaWithAmount={renderQuotaWithAmount}
-          getAmount={getAmount}
+          previewAmount={previewAmount}
           setTopUpCount={setTopUpCount}
           setSelectedPreset={setSelectedPreset}
           renderAmount={renderAmount}

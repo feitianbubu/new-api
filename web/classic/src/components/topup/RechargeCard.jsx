@@ -412,6 +412,7 @@ const RechargeCard = ({
                         return (
                           <span
                             style={{
+                              display: 'none',
                               color: 'var(--semi-color-text-2)',
                               fontSize: '12px',
                               fontWeight: 'normal',

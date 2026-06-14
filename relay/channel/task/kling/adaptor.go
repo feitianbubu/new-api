@@ -23,6 +23,9 @@ import (
 	taskcommon "github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+
+	"github.com/shopspring/decimal"
 )
 
 // ============================
@@ -549,8 +552,10 @@ func (a *TaskAdaptor) UpdateBalance(channel *model.Channel) (float64, error) {
 			balance += pack.Remaining
 		}
 	}
-	channel.UpdateBalance(balance)
-	return balance, nil
+	// Kling resource-pack quantity (credits) is 1:1 with CNY; convert to USD for storage.
+	balanceUsd := decimal.NewFromFloat(balance).Div(decimal.NewFromFloat(operation_setting.USDExchangeRate)).InexactFloat64()
+	channel.UpdateBalance(balanceUsd)
+	return balanceUsd, nil
 }
 
 func getResponseBody(method, url string, channel *model.Channel, headers http.Header) ([]byte, error) {

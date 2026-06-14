@@ -231,8 +231,10 @@ func (a *TaskAdaptor) UpdateBalance(channel *model.Channel) (float64, error) {
 	if creditResp.Code != http.StatusOK {
 		return 0, fmt.Errorf("suno credit query failed: code=%d, msg=%s", creditResp.Code, creditResp.Msg)
 	}
-	channel.UpdateBalance(creditResp.Data)
-	return creditResp.Data, nil
+	// Suno 返回的是积分,每个积分价值 $0.005,换算成美元
+	balance := creditResp.Data * 0.005
+	channel.UpdateBalance(balance)
+	return balance, nil
 }
 
 func ParseResponseItems(responseBody []byte) (dto.TaskResponse[[]dto.SunoDataResponse], error) {

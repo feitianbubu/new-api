@@ -252,6 +252,8 @@ const RechargeCard = ({
                 <Row gutter={12}>
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>
                     <Form.Slider
+                      // Semi Slider 挂载后不再同步 min/max，用 key 在其变化时重挂载
+                      key={`${minTopUp}-${sliderMax}`}
                       field='topUpCount'
                       label={t('充值数量')}
                       disabled={

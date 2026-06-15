@@ -361,6 +361,32 @@ type BalanceUpdater interface {
 	UpdateBalance(channel *model.Channel) (float64, error)
 }
 
+type upstreamStatusResponse struct {
+	Data struct {
+		CurrencySymbol   string `json:"currency_symbol"`
+		QuotaDisplayType string `json:"quota_display_type"`
+	} `json:"data"`
+}
+
+func normalizeUpstreamBalance(channel *model.Channel, baseURL string, balance float64) float64 {
+	if operation_setting.USDExchangeRate <= 0 {
+		return balance
+	}
+	body, err := GetResponseBody("GET", baseURL+"/api/status", channel, http.Header{})
+	if err != nil {
+		return balance
+	}
+	var status upstreamStatusResponse
+	if err := common.Unmarshal(body, &status); err != nil {
+		return balance
+	}
+	if status.Data.CurrencySymbol == operation_setting.QuotaDisplayTypeCNY ||
+		status.Data.QuotaDisplayType == operation_setting.QuotaDisplayTypeCNY {
+		return balance / operation_setting.USDExchangeRate
+	}
+	return balance
+}
+
 func updateChannelBalance(channel *model.Channel) (float64, error) {
 	if adaptor := relay.GetTaskAdaptor(constant.TaskPlatform(strconv.Itoa(channel.Type))); adaptor != nil {
 		if balanceUpdater, ok := adaptor.(BalanceUpdater); ok {
@@ -429,6 +455,7 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 		return 0, err
 	}
 	balance := subscription.HardLimitUSD - usage.TotalUsage/100
+	balance = normalizeUpstreamBalance(channel, baseURL, balance)
 	channel.UpdateBalance(balance)
 	return balance, nil
 }

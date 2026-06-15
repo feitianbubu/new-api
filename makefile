@@ -2,8 +2,9 @@ FRONTEND_DIR = ./web/default
 FRONTEND_CLASSIC_DIR = ./web/classic
 SWAG_FRONTEND_DIR ?= $(FRONTEND_CLASSIC_DIR)
 SWAG_DIST_DIR = $(SWAG_FRONTEND_DIR)/dist/swag
-# 不进 package.json(swag 时从 CDN 取),以保持 bun.lock 与上游一致、避免 rebase 冲突
+# 不进 package.json:vendor 到 scripts/vendor/ 入库,保持 bun.lock 与上游一致、避免 rebase 冲突,并锁版本防 CDN 投毒
 SCALAR_API_REFERENCE_VERSION ?= 1.40.9
+SCALAR_VENDOR_FILE = scripts/vendor/scalar-api-reference-$(SCALAR_API_REFERENCE_VERSION).js
 BACKEND_DIR = .
 DEV_FRONTEND_DEFAULT_PORT ?= 5173
 DEV_FRONTEND_CLASSIC_PORT ?= 5174
@@ -93,8 +94,8 @@ swag:
 	@bun scripts/patch_openapi.js $(SWAG_DIST_DIR)/openapi3.json
 	@bun scripts/patch_image_generation_openapi.js $(SWAG_DIST_DIR)/openapi3.json
 	@bun scripts/patch_audio.js $(SWAG_DIST_DIR)/openapi3.json
-	@echo "Downloading Scalar API Reference standalone bundle (v$(SCALAR_API_REFERENCE_VERSION))..."
-	@curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused "https://cdn.jsdelivr.net/npm/@scalar/api-reference@$(SCALAR_API_REFERENCE_VERSION)/dist/browser/standalone.js" -o $(SWAG_DIST_DIR)/api-reference
+	@echo "Vendoring Scalar API Reference standalone bundle (v$(SCALAR_API_REFERENCE_VERSION)) from $(SCALAR_VENDOR_FILE)..."
+	@cp $(SCALAR_VENDOR_FILE) $(SWAG_DIST_DIR)/api-reference
 	@echo "Mirroring swag/ to default theme dist..."
 	@rm -rf $(FRONTEND_DIR)/dist/swag
 	@mkdir -p $(FRONTEND_DIR)/dist

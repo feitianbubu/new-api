@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/storage"
 	storagecommon "github.com/QuantumNous/new-api/storage/common"
 	"github.com/gin-gonic/gin"
@@ -709,6 +710,6 @@ func uploadSingleFile(ctx context.Context, storageInstance storage.Storage, obje
 		return fmt.Errorf("failed to upload to OSS: %w", err)
 	}
 
-	log.Printf("Successfully uploaded to OSS: %s", objectKey)
+	logger.LogDebug(ctx, "Successfully uploaded to OSS: %s", objectKey)
 	return nil
 }

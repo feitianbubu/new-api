@@ -56,10 +56,33 @@ func formatBalanceAmount(usd float64) string {
 }
 
 type channelDaysRemaining struct {
-	id      int
-	name    string
-	balance float64
-	days    float64
+	id       int
+	name     string
+	balance  float64
+	avgDaily float64
+	days     float64
+}
+
+// formatChannelBalanceAlert 渲染多行卡片通知;正文以 \n 换行,交由发送层处理换行。
+func formatChannelBalanceAlert(below []channelDaysRemaining, threshold int, now time.Time) (string, string) {
+	sort.Slice(below, func(i, j int) bool { return below[i].days < below[j].days })
+	shown := below[:min(len(below), channelBalanceDaysAlertTopN)]
+
+	lines := []string{fmt.Sprintf("⚠️ 渠道余额预警 · 共 %d 个通道预计不足 %d 天", len(below), threshold)}
+	for _, c := range shown {
+		lines = append(lines,
+			"",
+			fmt.Sprintf("%s（#%d） 约剩 %.1f 天", c.name, c.id, c.days),
+			fmt.Sprintf("余额 %s · 日均 %s", formatBalanceAmount(c.balance), formatBalanceAmount(c.avgDaily)),
+		)
+	}
+	if len(below) > len(shown) {
+		lines = append(lines, "", fmt.Sprintf("……共 %d 个通道低于阈值，仅展示最紧急的 %d 个", len(below), len(shown)))
+	}
+	lines = append(lines, "", fmt.Sprintf("阈值 %d 天 · %s", threshold, now.Format("2006-01-02 15:04")))
+
+	subject := fmt.Sprintf("渠道余额预警：%d 个通道预计剩余不足 %d 天", len(below), threshold)
+	return subject, strings.Join(lines, "\n")
 }
 
 func checkChannelBalanceDaysOnce(threshold int) {
@@ -97,23 +120,13 @@ func checkChannelBalanceDaysOnce(threshold int) {
 		avgDailyUsd := float64(usage.Quota) / float64(max(usage.ActiveDays, 1)) / common.QuotaPerUnit
 		days := liveBalance / avgDailyUsd
 		if days < float64(threshold) {
-			below = append(below, channelDaysRemaining{channel.Id, channel.Name, liveBalance, days})
+			below = append(below, channelDaysRemaining{channel.Id, channel.Name, liveBalance, avgDailyUsd, days})
 		}
 	}
 	if len(below) == 0 {
 		return
 	}
 
-	sort.Slice(below, func(i, j int) bool { return below[i].days < below[j].days })
-	shown := below[:min(len(below), channelBalanceDaysAlertTopN)]
-	lines := make([]string, 0, len(shown))
-	for _, c := range shown {
-		lines = append(lines, fmt.Sprintf("通道「%s」（#%d）余额 %s，预计约剩 %.1f 天", c.name, c.id, formatBalanceAmount(c.balance), c.days))
-	}
-	content := strings.Join(lines, "\n")
-	if len(below) > len(shown) {
-		content += fmt.Sprintf("\n……共 %d 个通道低于阈值，仅展示最紧急的 %d 个", len(below), len(shown))
-	}
-	subject := fmt.Sprintf("渠道余额预警：%d 个通道预计剩余不足 %d 天", len(below), threshold)
+	subject, content := formatChannelBalanceAlert(below, threshold, time.Now())
 	NotifyRootUser(channelBalanceDaysAlertNotifyType, subject, content)
 }

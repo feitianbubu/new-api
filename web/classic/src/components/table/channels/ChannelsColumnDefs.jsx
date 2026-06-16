@@ -270,6 +270,13 @@ const renderDaysHint = (daysRemaining, noRecentUsage, t) => {
   return t('约剩 {{days}} 天', { days: Math.round(daysRemaining) });
 };
 
+const getDaysHintType = (daysRemaining) => {
+  if (daysRemaining == null) return 'tertiary';
+  if (daysRemaining <= 7) return 'danger';
+  if (daysRemaining <= 15) return 'warning';
+  return 'tertiary';
+};
+
 const isRequestPassThroughEnabled = (record) => {
   if (!record || record.children !== undefined) {
     return false;
@@ -589,7 +596,7 @@ export const getChannelsColumns = ({
                 </Tooltip>
                 {daysHint && (
                   <Typography.Text
-                    type='tertiary'
+                    type={getDaysHintType(daysRemaining)}
                     size='small'
                     style={{ whiteSpace: 'nowrap' }}
                   >

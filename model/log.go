@@ -766,6 +766,34 @@ func GetChannelsRecentUsage(channelIds []int, since int64, maxActiveDays int) (m
 	return usageMap, nil
 }
 
+// GetChannelsQuotaSince returns, per channel, the consumed quota summed over a
+// sliding window starting at the since timestamp (not day-bucketed). Channels
+// with no consumption in the window are absent from the map.
+func GetChannelsQuotaSince(channelIds []int, since int64) (map[int]int64, error) {
+	result := make(map[int]int64)
+	if len(channelIds) == 0 {
+		return result, nil
+	}
+	var rows []struct {
+		ChannelId int
+		Quota     int64
+	}
+	err := LOG_DB.Table("logs").
+		Select("channel_id, sum(quota) as quota").
+		Where("type = ?", LogTypeConsume).
+		Where("created_at >= ?", since).
+		Where("channel_id IN ?", channelIds).
+		Group("channel_id").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.ChannelId] = row.Quota
+	}
+	return result, nil
+}
+
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {
 	tx := LOG_DB.Table("logs").Select("ifnull(sum(prompt_tokens),0) + ifnull(sum(completion_tokens),0)")
 	if username != "" {

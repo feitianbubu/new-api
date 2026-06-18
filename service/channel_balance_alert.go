@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -46,13 +47,13 @@ func startChannelBalanceDaysAlertTask() {
 }
 
 // formatBalanceAmount renders a USD amount in the site's quota display
-// currency, matching the frontend renderQuotaWithAmount.
+// currency, rounding up to the cent so a small positive balance never reads as 0.
 func formatBalanceAmount(usd float64) string {
 	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
 		return fmt.Sprintf("%.0f", usd*common.QuotaPerUnit)
 	}
-	rate := operation_setting.GetUsdToCurrencyRate(operation_setting.USDExchangeRate)
-	return fmt.Sprintf("%s%.2f", operation_setting.GetCurrencySymbol(), usd*rate)
+	amount := math.Ceil(usd*operation_setting.GetUsdToCurrencyRate(operation_setting.USDExchangeRate)*100) / 100
+	return fmt.Sprintf("%s%.2f", operation_setting.GetCurrencySymbol(), amount)
 }
 
 type channelDaysRemaining struct {
@@ -60,20 +61,48 @@ type channelDaysRemaining struct {
 	name     string
 	balance  float64
 	avgDaily float64
-	days     float64
+	avgDays  int
+	last24h  float64
+}
+
+func (c channelDaysRemaining) daysByAvg() float64 { return daysRemaining(c.balance, c.avgDaily) }
+func (c channelDaysRemaining) daysBy24h() float64 { return daysRemaining(c.balance, c.last24h) }
+func (c channelDaysRemaining) urgency() float64   { return min(c.daysByAvg(), c.daysBy24h()) }
+
+func daysRemaining(balance, dailyUsd float64) float64 {
+	if dailyUsd <= 0 {
+		return math.Inf(1)
+	}
+	return balance / dailyUsd
+}
+
+func formatDaysRemaining(days float64) string {
+	switch {
+	case days < 1:
+		return "不足 1 天"
+	case days > 999:
+		return "超过 999 天"
+	default:
+		return fmt.Sprintf("约剩 %.1f 天", days)
+	}
 }
 
 // formatChannelBalanceAlert 渲染多行卡片通知;正文以 \n 换行,交由发送层处理换行。
 func formatChannelBalanceAlert(below []channelDaysRemaining, threshold int, now time.Time) (string, string) {
-	sort.Slice(below, func(i, j int) bool { return below[i].days < below[j].days })
+	sort.Slice(below, func(i, j int) bool { return below[i].urgency() < below[j].urgency() })
 	shown := below[:min(len(below), channelBalanceDaysAlertTopN)]
 
-	lines := []string{fmt.Sprintf("⚠️ 渠道余额预警 · 共 %d 个通道预计不足 %d 天", len(below), threshold)}
+	lines := []string{fmt.Sprintf("⚠️ 渠道余额预警 · %d 个通道", len(below))}
 	for _, c := range shown {
+		last24hLine := "近24h 无消费"
+		if c.last24h > 0 {
+			last24hLine = fmt.Sprintf("近24h %s · %s", formatBalanceAmount(c.last24h), formatDaysRemaining(c.daysBy24h()))
+		}
 		lines = append(lines,
 			"",
-			fmt.Sprintf("%s（#%d） 约剩 %.1f 天", c.name, c.id, c.days),
-			fmt.Sprintf("余额 %s · 日均 %s", formatBalanceAmount(c.balance), formatBalanceAmount(c.avgDaily)),
+			fmt.Sprintf("%s（#%d） 余额 %s", c.name, c.id, formatBalanceAmount(c.balance)),
+			fmt.Sprintf("%d日均 %s · %s", c.avgDays, formatBalanceAmount(c.avgDaily), formatDaysRemaining(c.daysByAvg())),
+			last24hLine,
 		)
 	}
 	if len(below) > len(shown) {
@@ -97,10 +126,15 @@ func checkChannelBalanceDaysOnce(threshold int) {
 	for _, channel := range channels {
 		channelIds = append(channelIds, channel.Id)
 	}
-	since := common.GetTimestamp() - model.ChannelRecentUsageLookbackDays*86400
-	usageMap, err := model.GetChannelsRecentUsage(channelIds, since, model.ChannelRecentUsageActiveDays)
+	now := common.GetTimestamp()
+	usageMap, err := model.GetChannelsRecentUsage(channelIds, now-model.ChannelRecentUsageLookbackDays*86400, model.ChannelRecentUsageActiveDays)
 	if err != nil {
 		common.SysError("channel balance days alert: failed to query recent usage: " + err.Error())
+		return
+	}
+	quota24hMap, err := model.GetChannelsQuotaSince(channelIds, now-86400)
+	if err != nil {
+		common.SysError("channel balance days alert: failed to query 24h usage: " + err.Error())
 		return
 	}
 
@@ -118,15 +152,20 @@ func checkChannelBalanceDaysOnce(threshold int) {
 			continue
 		}
 		avgDailyUsd := float64(usage.Quota) / float64(max(usage.ActiveDays, 1)) / common.QuotaPerUnit
-		days := liveBalance / avgDailyUsd
-		if days < float64(threshold) {
-			below = append(below, channelDaysRemaining{channel.Id, channel.Name, liveBalance, avgDailyUsd, days})
+		last24hUsd := float64(quota24hMap[channel.Id]) / common.QuotaPerUnit
+		c := channelDaysRemaining{
+			id: channel.Id, name: channel.Name, balance: liveBalance,
+			avgDaily: avgDailyUsd, avgDays: usage.ActiveDays,
+			last24h:  last24hUsd,
+		}
+		if c.urgency() <= float64(threshold) {
+			below = append(below, c)
 		}
 	}
 	if len(below) == 0 {
 		return
 	}
 
-	subject, content := formatChannelBalanceAlert(below, threshold, time.Now())
+	subject, content := formatChannelBalanceAlert(below, threshold, time.Unix(now, 0))
 	NotifyRootUser(channelBalanceDaysAlertNotifyType, subject, content)
 }

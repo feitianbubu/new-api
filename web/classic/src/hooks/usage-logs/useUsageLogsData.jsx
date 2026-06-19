@@ -294,12 +294,14 @@ export const useLogsData = () => {
       end_timestamp,
       channel,
       group,
+      instance,
       logType: formLogType,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
     let localStartTimestamp = Date.parse(start_timestamp) / 1000;
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
     let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
+    if (instance) url += `&instance=${instance}`;
     url = encodeURI(url);
     let res = await API.get(url);
     const { success, message, data } = res.data;

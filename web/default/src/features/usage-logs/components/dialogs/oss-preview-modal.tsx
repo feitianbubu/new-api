@@ -97,7 +97,7 @@ export function OSSPreviewModal({
   const [, forceRender] = useState(0)
 
   const setContent = useCallback((id: string, next: Partial<ContentState>) => {
-    cache.current[id] = {
+    const prev: ContentState = cache.current[id] ?? {
       display: '',
       rawPreview: null,
       rawFull: null,
@@ -105,7 +105,9 @@ export function OSSPreviewModal({
       loading: false,
       loadingMode: null,
       error: '',
-      ...cache.current[id],
+    }
+    cache.current[id] = {
+      ...prev,
       ...next,
     }
     forceRender((n) => n + 1)

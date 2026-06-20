@@ -11,12 +11,11 @@ import (
 	"github.com/QuantumNous/new-api/common/registry"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
-	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/robfig/cron/v3"
 )
 
 const (
 	channelBalanceDaysAlertNotifyType = "channel_balance_days_alert"
-	channelBalanceDaysAlertInterval   = 24 * time.Hour
 	channelBalanceDaysAlertTopN       = 3
 )
 
@@ -24,26 +23,30 @@ func init() {
 	registry.RegisterInit(startChannelBalanceDaysAlertTask)
 }
 
-// startChannelBalanceDaysAlertTask sends root a daily digest of enabled
-// channels whose estimated days remaining fall below
-// CHANNEL_BALANCE_DAYS_ALERT_THRESHOLD (days); unset or invalid disables the task.
+// startChannelBalanceDaysAlertTask sends root a digest of enabled channels
+// whose estimated days remaining fall below CHANNEL_BALANCE_DAYS_ALERT_THRESHOLD
+// (days). The task runs on the cron schedule in CHANNEL_BALANCE_DAYS_ALERT_CRON
+// (standard 5-field cron, also supports @daily/@hourly/@every descriptors);
+// leaving either unset disables the task.
 func startChannelBalanceDaysAlertTask() {
+	if !common.IsMasterNode {
+		return
+	}
+	spec := common.GetEnvOrDefaultString("CHANNEL_BALANCE_DAYS_ALERT_CRON", "")
+	if spec == "" {
+		return
+	}
 	threshold := common.GetEnvOrDefault("CHANNEL_BALANCE_DAYS_ALERT_THRESHOLD", 0)
 	if threshold <= 0 {
 		return
 	}
-	if !common.IsMasterNode {
+	c := cron.New()
+	if _, err := c.AddFunc(spec, func() { checkChannelBalanceDaysOnce(threshold) }); err != nil {
+		common.SysError(fmt.Sprintf("channel balance days alert: invalid cron spec %q: %s; task disabled", spec, err.Error()))
 		return
 	}
-	gopool.Go(func() {
-		common.SysLog(fmt.Sprintf("channel balance days alert task started: threshold=%d days", threshold))
-		ticker := time.NewTicker(channelBalanceDaysAlertInterval)
-		defer ticker.Stop()
-		checkChannelBalanceDaysOnce(threshold)
-		for range ticker.C {
-			checkChannelBalanceDaysOnce(threshold)
-		}
-	})
+	c.Start()
+	common.SysLog(fmt.Sprintf("channel balance days alert task started: threshold=%d days, cron=%q", threshold, spec))
 }
 
 // formatBalanceAmount renders a USD amount in the site's quota display
@@ -156,7 +159,7 @@ func checkChannelBalanceDaysOnce(threshold int) {
 		c := channelDaysRemaining{
 			id: channel.Id, name: channel.Name, balance: liveBalance,
 			avgDaily: avgDailyUsd, avgDays: usage.ActiveDays,
-			last24h:  last24hUsd,
+			last24h: last24hUsd,
 		}
 		if c.urgency() <= float64(threshold) {
 			below = append(below, c)

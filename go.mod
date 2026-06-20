@@ -66,6 +66,8 @@ require github.com/waffo-com/waffo-pancake-sdk-go v0.3.1
 
 require github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
 
+require github.com/robfig/cron/v3 v3.0.1
+
 require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.22 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect

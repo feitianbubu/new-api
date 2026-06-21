@@ -41,6 +41,27 @@ const examples = {
       }
     }
   },
+  gemini_thinking: {
+    summary: "Gemini 思考链(reasoning_content)示例",
+    value: {
+      model: "gemini-3.5-flash",
+      messages: [
+        {
+          role: "user",
+          content: "一个农夫要把一只狼、一只羊和一筐白菜运过河，小船每次只能带一样，且狼和羊、羊和白菜不能单独留在一起，请给出过河步骤。"
+        }
+      ],
+      extra_body: {
+        google: {
+          thinking_config: {
+            include_thoughts: true
+          }
+        }
+      },
+      temperature: 0.7,
+      stream: false
+    }
+  },
   image: {
     summary: "图片理解示例",
     value: {

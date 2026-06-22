@@ -111,6 +111,11 @@ type requestPayload struct {
 	ShotType       string            `json:"shot_type,omitempty"`
 	MultiPrompt    []MultiPromptItem `json:"multi_prompt,omitempty"`
 	VoiceList      []VoiceItem       `json:"voice_list,omitempty"`
+	// Motion-Control specific fields (carried via metadata passthrough)
+	ImageUrl             string `json:"image_url,omitempty"`
+	VideoUrl             string `json:"video_url,omitempty"`
+	CharacterOrientation string `json:"character_orientation,omitempty"` // image or video; required by motion-control
+	KeepOriginalSound    string `json:"keep_original_sound,omitempty"`   // yes or no
 }
 
 type WatermarkInfo struct {
@@ -186,7 +191,10 @@ func (a *TaskAdaptor) BuildRequestURL(info *relaycommon.RelayInfo) (string, erro
 }
 
 func actionToPath(action, model string) string {
-	if strings.Contains(model, "o1") {
+	if action == constant.TaskActionMotionControl {
+		return "/v1/videos/motion-control"
+	}
+	if isOmniModel(model) {
 		return "/v1/videos/omni-video"
 	}
 	switch action {
@@ -308,7 +316,7 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 }
 
 func (a *TaskAdaptor) GetModelList() []string {
-	return []string{"kling-v1", "kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6", "kling-v3"}
+	return []string{"kling-v1", "kling-v1-6", "kling-v2-master", "kling-v2-1-master", "kling-v2-5-turbo", "kling-v2-6", "kling-v3", "kling-video-o1", "kling-v3-omni"}
 }
 
 func (a *TaskAdaptor) GetChannelName() string {
@@ -337,7 +345,7 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 	}
 	var action string
 	switch {
-	case strings.Contains(req.Model, "o1"):
+	case isOmniModel(req.Model):
 		if n := len(req.Images); n > 0 {
 			items := make([]ImageItem, 0, n)
 			for i, img := range req.Images {
@@ -368,7 +376,17 @@ func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, in
 	if err := taskcommon.UnmarshalMetadata(req.Metadata, &r); err != nil {
 		return nil, "", errors.Wrap(err, "unmarshal metadata failed")
 	}
-	if action == "" && !strings.Contains(req.Model, "o1") {
+	// character_orientation is required by and unique to motion-control, so its
+	// presence identifies the request. Strip fields the endpoint does not accept.
+	if r.CharacterOrientation != "" {
+		r.Image = ""
+		r.ImageList = nil
+		r.Duration = ""
+		r.AspectRatio = ""
+		r.CfgScale = 0
+		return &r, constant.TaskActionMotionControl, nil
+	}
+	if action == "" {
 		switch {
 		case r.ImageList != nil:
 			action = constant.TaskActionReferenceGenerate
@@ -464,6 +482,12 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 
 func isNewAPIRelay(apiKey string) bool {
 	return strings.HasPrefix(apiKey, "sk-")
+}
+
+// isOmniModel reports whether the model targets the Omni video endpoint.
+// Both naming schemes exist upstream: kling-video-o1 and kling-v3-omni.
+func isOmniModel(model string) bool {
+	return strings.Contains(model, "o1") || strings.Contains(model, "omni")
 }
 
 func (a *TaskAdaptor) ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error) {

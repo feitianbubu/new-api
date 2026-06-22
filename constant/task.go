@@ -18,6 +18,7 @@ const (
 	TaskActionReferenceGenerate = "referenceGenerate"
 	TaskActionRemix             = "remixGenerate"
 	TaskActionMultiFrame        = "multiFrameGenerate" // vidu智能多帧
+	TaskActionMotionControl     = "motionControl"      // kling 动作控制
 )
 
 var SunoModel2Action = map[string]string{

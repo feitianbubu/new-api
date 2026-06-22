@@ -22,6 +22,7 @@ var channelsNeedingURLConversion = map[int]struct{}{
 	constant.ChannelTypeVolcEngine:  {},
 	constant.ChannelTypeJimeng:      {},
 	constant.ChannelTypeDoubaoVideo: {},
+	constant.ChannelTypeKling:       {},
 }
 
 // uploadableFields 是上述通道适配器实际通过 c.PostFormArray 读取的字段集合。

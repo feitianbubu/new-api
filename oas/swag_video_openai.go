@@ -9,8 +9,8 @@ import (
 // @Description 根据文本提示词生成视频。可选择上传参考图片来引导视频生成。
 // @Description
 // @Description * OpenAI: https://developers.openai.com/api/reference/resources/videos/methods/create
-// @Description * 万相: https://www.alibabacloud.com/help/zh/model-studio/image-to-video-api-reference
-// @Description * happyhorse: https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference
+// @Description * 阿里万相: https://www.alibabacloud.com/help/zh/model-studio/image-to-video-api-reference
+// @Description * 快乐马: https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference
 // @Description * 可灵: https://app.klingai.com/cn/dev/document-api/apiReference/model/skillsMap
 // @Description * 即梦: https://www.volcengine.com/docs/85621/1792707
 // @Description * 即梦数字人: https://www.volcengine.com/docs/85621/1829013

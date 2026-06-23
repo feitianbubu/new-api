@@ -396,6 +396,7 @@ type RecordTaskBillingLogParams struct {
 	UseTime          int
 	Properties       *Properties
 	Other            map[string]interface{}
+	NodeName         string // 任务发起节点；为空时回退当前节点
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -437,6 +438,10 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		common.SysLog("failed to record task billing log: " + err.Error())
 	}
 	if params.LogType == LogTypeConsume && common.DataExportEnabled {
+		nodeName := params.NodeName
+		if nodeName == "" {
+			nodeName = common.NodeName
+		}
 		gopool.Go(func() {
 			LogQuotaData(QuotaDataLogParams{
 				UserID:    params.UserId,
@@ -448,7 +453,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 				UseGroup:  params.Group,
 				TokenID:   params.TokenId,
 				ChannelID: params.ChannelId,
-				NodeName:  common.NodeName,
+				NodeName:  nodeName,
 			})
 		})
 	}

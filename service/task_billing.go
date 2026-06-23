@@ -261,6 +261,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		Properties:       &task.Properties,
 		UseTime:          useTime,
 		Other:            other,
+		NodeName:         task.PrivateData.NodeName,
 	})
 }
 

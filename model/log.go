@@ -509,7 +509,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if err != nil {
 		return nil, 0, err
 	}
-	tryFetchDisplayName(logs)
+	FillUserDisplayNames(logs, func(l *Log) int { return l.UserId }, func(l *Log, name string) { l.DisplayName = name })
 
 	channelIds := types.NewSet[int]()
 	for _, log := range logs {
@@ -626,7 +626,7 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 
 func SearchAllLogs(keyword string) (logs []*Log, err error) {
 	err = LOG_DB.Where("type = ? or content LIKE ?", keyword, keyword+"%").Order("id desc").Limit(common.MaxRecentItems).Find(&logs).Error
-	tryFetchDisplayName(logs)
+	FillUserDisplayNames(logs, func(l *Log) int { return l.UserId }, func(l *Log, name string) { l.DisplayName = name })
 	return logs, err
 }
 
@@ -635,29 +635,6 @@ func SearchAllLogs(keyword string) (logs []*Log, err error) {
 //	formatUserLogs(logs)
 //	return
 //}
-
-func tryFetchDisplayName(logs []*Log) {
-	if len(logs) == 0 {
-		return
-	}
-	userIds := lo.Uniq(lo.Map(logs, func(log *Log, _ int) int {
-		return log.UserId
-	}))
-	var users []*User
-	if err := DB.Where("id in ?", userIds).Select("id, display_name").Find(&users).Error; err != nil {
-		return
-	}
-	userMap := make(map[int]string, len(users))
-	for _, user := range users {
-		userMap[user.Id] = user.DisplayName
-	}
-	for _, log := range logs {
-		if displayName, ok := userMap[log.UserId]; ok {
-			log.DisplayName = displayName
-		}
-	}
-	return
-}
 
 type Stat struct {
 	Quota int `json:"quota"`

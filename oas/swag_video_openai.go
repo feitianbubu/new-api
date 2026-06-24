@@ -5,8 +5,8 @@ import (
 )
 
 // OpenAIVideos
-// @Summary 视频生成
-// @Description 根据文本提示词生成视频。可选择上传参考图片来引导视频生成。
+// @Summary 视频/3D生成
+// @Description 根据文本提示词生成视频/3D。可选择上传参考图片来引导任务生成。
 // @Description
 // @Description * OpenAI: https://developers.openai.com/api/reference/resources/videos/methods/create
 // @Description * 阿里万相: https://www.alibabacloud.com/help/zh/model-studio/image-to-video-api-reference
@@ -15,10 +15,12 @@ import (
 // @Description * 即梦: https://www.volcengine.com/docs/85621/1792707
 // @Description * 即梦数字人: https://www.volcengine.com/docs/85621/1829013
 // @Description * 豆包视频: https://www.volcengine.com/docs/82379/1520758
-// @Description * 豆包3D: https://www.volcengine.com/docs/82379/1856293
 // @Description * Vidu: https://platform.vidu.cn/docs/text-to-video
 // @Description * 海螺: https://platform.minimaxi.com/docs/api-reference/video-generation-intro
 // @Description * Veo: https://ai.google.dev/gemini-api/docs/video
+// @Description * 豆包3D: https://www.volcengine.com/docs/82379/1856293
+// @Description * 影眸3D: https://www.volcengine.com/docs/82379/2279947
+// @Description * 数美3D: https://www.volcengine.com/docs/82379/2307070
 // @Description
 // @Description ### 示例请求:
 // @Description		```
@@ -102,8 +104,8 @@ import (
 func OpenAIVideos(c *gin.Context) {}
 
 // OpenAIVideosRetrieve
-// @Summary 视频查询
-// @Description 根据任务ID查询视频生成的状态和结果。可获取生成进度、输出URL等信息。
+// @Summary 视频/3D查询
+// @Description 根据任务ID查询任务生成的状态和结果。可获取生成进度、输出URL等信息。
 // @Description
 // @Description 参考文档: https://developers.openai.com/api/reference/resources/videos/methods/retrieve
 // @Description
@@ -121,8 +123,8 @@ func OpenAIVideos(c *gin.Context) {}
 func OpenAIVideosRetrieve(c *gin.Context) {}
 
 // OpenAIVideosContent
-// @Summary 视频下载
-// @Description 根据任务ID下载已有效期内的视频文件。
+// @Summary 视频/3D下载
+// @Description 根据任务ID下载已有效期内的文件。
 // @Description
 // @Description 注意: 必须等待视频生成任务完成后才能下载
 // @Description     ```

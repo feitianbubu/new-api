@@ -2,6 +2,23 @@ package oas
 
 import "github.com/gin-gonic/gin"
 
+// ImagesGenerations swagger 图像生成
+// @Summary 图像生成
+// @Description 接收符合 OpenAI API 格式的图像生成请求
+// @Description * OpenAI: https://developers.openai.com/api/reference/resources/images/methods/generate
+// @Description * 千问: https://help.aliyun.com/zh/model-studio/qwen-image-api
+// @Description * 豆包: https://www.volcengine.com/docs/82379/1824121
+// @Description * Gemini(imagen): https://ai.google.dev/gemini-api/docs/imagen
+// @Description * Gemini(nano-banana): https://ai.google.dev/gemini-api/docs/image-generation
+// @Tags OpenAI
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.ImageRequest true "OpenAI 请求体"
+// @Success 200 {object} dto.ImageResponse 成功响应
+// @Router /v1/images/generations [post]
+func ImagesGenerations(c *gin.Context) {}
+
 // ImagesEdits swagger 图像编辑
 // @Summary 图像编辑
 // @Description 根据用户提供的源图像、遮罩和文本提示，编辑现有图像

@@ -33,18 +33,19 @@ var defaultModelRatio = map[string]float64{
 	"gpt-4-0613":                                15,
 	"gpt-4-32k":                                 30,
 	"gpt-4-32k-0613":                            30,
-	"gpt-4-1106-preview":                        5,    // $10 / 1M tokens
-	"gpt-4-0125-preview":                        5,    // $10 / 1M tokens
-	"gpt-4-turbo-preview":                       5,    // $10 / 1M tokens
-	"gpt-4-vision-preview":                      5,    // $10 / 1M tokens
-	"gpt-4-1106-vision-preview":                 5,    // $10 / 1M tokens
-	"chatgpt-4o-latest":                         2.5,  // $5 / 1M tokens
-	"gpt-4o":                                    1.25, // $2.5 / 1M tokens
-	"gpt-4o-audio-preview":                      1.25, // $2.5 / 1M tokens
-	"gpt-4o-audio-preview-2024-10-01":           1.25, // $2.5 / 1M tokens
-	"gpt-4o-2024-05-13":                         2.5,  // $5 / 1M tokens
-	"gpt-4o-2024-08-06":                         1.25, // $2.5 / 1M tokens
-	"gpt-4o-2024-11-20":                         1.25, // $2.5 / 1M tokens
+	"gpt-4-1106-preview":                        5,     // $10 / 1M tokens
+	"gpt-4-0125-preview":                        5,     // $10 / 1M tokens
+	"gpt-4-turbo-preview":                       5,     // $10 / 1M tokens
+	"gpt-4-vision-preview":                      5,     // $10 / 1M tokens
+	"gpt-4-1106-vision-preview":                 5,     // $10 / 1M tokens
+	"chatgpt-4o-latest":                         2.5,   // $5 / 1M tokens
+	"gpt-4o":                                    1.25,  // $2.5 / 1M tokens
+	"gpt-4o-audio-preview":                      1.25,  // $2.5 / 1M tokens
+	"gpt-4o-audio-preview-2024-10-01":           1.25,  // $2.5 / 1M tokens
+	"gpt-4o-mini-audio-preview":                 0.075, // $0.15 / 1M tokens
+	"gpt-4o-2024-05-13":                         2.5,   // $5 / 1M tokens
+	"gpt-4o-2024-08-06":                         1.25,  // $2.5 / 1M tokens
+	"gpt-4o-2024-11-20":                         1.25,  // $2.5 / 1M tokens
 	"gpt-4o-realtime-preview":                   2.5,
 	"gpt-4o-realtime-preview-2024-10-01":        2.5,
 	"gpt-4o-realtime-preview-2024-12-17":        2.5,
@@ -134,20 +135,26 @@ var defaultModelRatio = map[string]float64{
 	"claude-3-7-sonnet-20250219":                1.5,
 	"claude-3-7-sonnet-20250219-thinking":       1.5,
 	"claude-sonnet-4-20250514":                  1.5,
+	"claude-sonnet-4-20250514-thinking":         1.5,
 	"claude-sonnet-4-5-20250929":                1.5,
+	"claude-sonnet-4-5-20250929-thinking":       1.5,
 	"claude-opus-4-5-20251101":                  2.5,
+	"claude-opus-4-5-20251101-thinking":         2.5,
 	"claude-opus-4-6":                           2.5,
+	"claude-opus-4-6-thinking":                  2.5,
 	"claude-opus-4-6-max":                       2.5,
 	"claude-opus-4-6-high":                      2.5,
 	"claude-opus-4-6-medium":                    2.5,
 	"claude-opus-4-6-low":                       2.5,
 	"claude-opus-4-7":                           2.5,
+	"claude-opus-4-7-thinking":                  2.5,
 	"claude-opus-4-7-max":                       2.5,
 	"claude-opus-4-7-xhigh":                     2.5,
 	"claude-opus-4-7-high":                      2.5,
 	"claude-opus-4-7-medium":                    2.5,
 	"claude-opus-4-7-low":                       2.5,
 	"claude-opus-4-8":                           2.5,
+	"claude-opus-4-8-thinking":                  2.5,
 	"claude-opus-4-8-max":                       2.5,
 	"claude-opus-4-8-xhigh":                     2.5,
 	"claude-opus-4-8-high":                      2.5,
@@ -155,7 +162,9 @@ var defaultModelRatio = map[string]float64{
 	"claude-opus-4-8-low":                       2.5,
 	"claude-3-opus-20240229":                    7.5, // $15 / 1M tokens
 	"claude-opus-4-20250514":                    7.5,
+	"claude-opus-4-20250514-thinking":           7.5,
 	"claude-opus-4-1-20250805":                  7.5,
+	"claude-opus-4-1-20250805-thinking":         7.5,
 	"ERNIE-4.0-8K":                              0.120 * RMB,
 	"ERNIE-3.5-8K":                              0.012 * RMB,
 	"ERNIE-3.5-8K-0205":                         0.024 * RMB,
@@ -190,6 +199,9 @@ var defaultModelRatio = map[string]float64{
 	"gemini-2.5-flash-lite-preview-thinking-*":  0.05,
 	"gemini-2.5-flash-lite-preview-06-17":       0.05,
 	"gemini-2.5-flash":                          0.15,
+	"gemini-3-flash-preview":                    0.25, // $0.5 / 1M tokens
+	"gemini-3-pro-preview":                      1,    // $2 / 1M tokens (<=200k)
+	"gemini-3.1-pro-preview":                    1,    // $2 / 1M tokens (<=200k)
 	"gemini-robotics-er-1.5-preview":            0.15,
 	"gemini-embedding-001":                      0.075,
 	"text-embedding-004":                        0.001,
@@ -312,13 +324,13 @@ var defaultAudioRatio = map[string]float64{
 }
 
 var defaultAudioCompletionRatio = map[string]float64{
-	"gpt-4o-realtime":      2,
-	"gpt-4o-mini-realtime": 2,
-	"gpt-4o-mini-tts":      1,
-	"tts-1":                0,
-	"tts-1-hd":             0,
-	"tts-1-1106":           0,
-	"tts-1-hd-1106":        0,
+	"gpt-4o-realtime-preview":      2,
+	"gpt-4o-mini-realtime-preview": 2,
+	"gpt-4o-mini-tts":              1,
+	"tts-1":                        0,
+	"tts-1-hd":                     0,
+	"tts-1-1106":                   0,
+	"tts-1-hd-1106":                0,
 }
 
 var modelPriceMap = types.NewRWMap[string, float64]()
@@ -577,10 +589,12 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 			return 2.5 / 0.3, false
 		} else if strings.HasPrefix(name, "gemini-robotics-er-1.5") {
 			return 2.5 / 0.3, false
-		} else if strings.HasPrefix(name, "gemini-3-pro") {
+		} else if strings.HasPrefix(name, "gemini-3-pro") || strings.HasPrefix(name, "gemini-3.1-pro") {
 			if strings.HasPrefix(name, "gemini-3-pro-image") {
 				return 60, false
 			}
+			return 6, false
+		} else if strings.HasPrefix(name, "gemini-3-flash") { // $0.5 输入 / $3 输出
 			return 6, false
 		}
 		return 4, false

@@ -1,7 +1,6 @@
 package model
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,58 +25,46 @@ const (
 func newGormConfig(prepareStmt bool) *gorm.Config {
 	return &gorm.Config{
 		PrepareStmt: prepareStmt,
-		Logger:      newGormLogger(),
+		Logger:      newGormLogger(os.Stdout),
 	}
 }
 
-func newGormLogger() logger.Interface {
-	return newGormLoggerWithWriter(os.Stdout)
-}
-
-func newGormLoggerWithWriter(w io.Writer) logger.Interface {
+func newGormLogger(w io.Writer) logger.Interface {
 	slowThresholdMs := common.GetEnvOrDefault("SQL_SLOW_THRESHOLD_MS", defaultSlowThresholdMs)
 	if slowThresholdMs < 0 || slowThresholdMs > maxSlowThresholdMs {
 		common.SysError(fmt.Sprintf("invalid SQL_SLOW_THRESHOLD_MS %d (allowed 0-%d, 0 disables slow query log), using default %d", slowThresholdMs, maxSlowThresholdMs, defaultSlowThresholdMs))
 		slowThresholdMs = defaultSlowThresholdMs
 	}
-	return &sanitizedGormLogger{Interface: logger.New(log.New(w, "\r\n", log.LstdFlags), logger.Config{
+	// 在 Writer 层脱敏而非包装 logger.Interface:后者会让 gorm 的 FileWithLineNum
+	// 把所有 SQL 日志的调用点归因到包装层自身,且需转发 ParamsFilter 类型断言。
+	return logger.New(&sanitizedLogWriter{delegate: log.New(w, "\r\n", log.LstdFlags)}, logger.Config{
 		SlowThreshold:             time.Duration(slowThresholdMs) * time.Millisecond,
 		LogLevel:                  logger.Warn,
 		IgnoreRecordNotFoundError: true,
 		ParameterizedQueries:      !common.DebugEnabled,
 		Colorful:                  true,
-	})}
+	})
 }
 
-// sanitizedGormLogger 在非 DEBUG 下把数据库驱动错误消息收敛为错误码:
-// ParameterizedQueries 只过滤 SQL 字符串,而 MySQL 1062、PG 23505 这类
-// 驱动错误消息本身会内联数据值,同样是泄漏面。
-type sanitizedGormLogger struct {
-	logger.Interface
+// ParameterizedQueries 只过滤 SQL 字符串,驱动错误消息(如 MySQL 1062)同样会
+// 内联数据值,在这里收敛为错误码;DEBUG=true 保留原文。
+type sanitizedLogWriter struct {
+	delegate *log.Logger
 }
 
-func (l *sanitizedGormLogger) LogMode(level logger.LogLevel) logger.Interface {
-	return &sanitizedGormLogger{Interface: l.Interface.LogMode(level)}
-}
-
-// gorm 对配置的 logger 本体做 ParamsFilter 类型断言,包装层必须转发。
-func (l *sanitizedGormLogger) ParamsFilter(ctx context.Context, sql string, params ...interface{}) (string, []interface{}) {
-	if pf, ok := l.Interface.(gorm.ParamsFilter); ok {
-		return pf.ParamsFilter(ctx, sql, params...)
+func (s *sanitizedLogWriter) Printf(format string, args ...interface{}) {
+	if !common.DebugEnabled {
+		for i, arg := range args {
+			if err, ok := arg.(error); ok {
+				args[i] = sanitizeDBError(err)
+			}
+		}
 	}
-	return sql, params
+	s.delegate.Printf(format, args...)
 }
 
-func (l *sanitizedGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	// ErrRecordNotFound 原样透传,内层 logger 依赖 errors.Is 识别并忽略它
-	if err != nil && !common.DebugEnabled && !errors.Is(err, gorm.ErrRecordNotFound) {
-		err = sanitizeDBError(err)
-	}
-	l.Interface.Trace(ctx, begin, fc, err)
-}
-
-// sanitizeDBError 只收敛四种数据库驱动的错误(消息由数据库服务端生成,可能内联
-// 数据值);网络/上下文等其它错误消息不含查询数据,原样保留以便运维排障。
+// 只收敛数据库服务端生成的驱动错误(消息可能内联数据值);网络/上下文等
+// 其它错误不含查询数据,原样保留以便排障。
 func sanitizeDBError(err error) error {
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) {

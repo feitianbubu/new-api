@@ -2,10 +2,8 @@ package model
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	"github.com/QuantumNous/new-api/common"
@@ -72,28 +70,33 @@ func TestSanitizeDBErrorSQLiteDriver(t *testing.T) {
 }
 
 func TestSanitizeDBErrorKeepsNonDriverErrors(t *testing.T) {
-	err := context.DeadlineExceeded
+	err := fmt.Errorf("dial tcp 127.0.0.1:3306: connect: connection refused")
 	assert.Equal(t, err, sanitizeDBError(err))
 }
 
-// 保护契约:错误日志里 SQL 参数化、驱动错误消息脱敏同时生效;DEBUG=true 保留原文。
-func TestGormLoggerTraceSanitizedOutput(t *testing.T) {
+// 保护契约:经 gorm 真实链路,错误日志同时满足 SQL 参数化、驱动错误脱敏、
+// 调用点归因到业务代码;DEBUG=true 恢复参数值与错误原文。
+func TestGormLoggerEndToEndSanitizedOutput(t *testing.T) {
 	previousDebug := common.DebugEnabled
 	t.Cleanup(func() { common.DebugEnabled = previousDebug })
 
-	driverErr := &mysql.MySQLError{Number: 1062, Message: "Duplicate entry 'secret-value' for key 'users.idx'"}
-	fc := func() (string, int64) { return "SELECT * FROM t WHERE k = ?", 0 }
+	execQuery := func() string {
+		var buf bytes.Buffer
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: newGormLogger(&buf)})
+		require.NoError(t, err)
+		db.Exec("SELECT * FROM missing_table WHERE k = ?", "secret-value")
+		return buf.String()
+	}
 
 	common.DebugEnabled = false
-	var buf bytes.Buffer
-	newGormLoggerWithWriter(&buf).Trace(context.Background(), time.Now(), fc, driverErr)
-	out := buf.String()
-	assert.Contains(t, out, "mysql error 1062")
+	out := execQuery()
 	assert.Contains(t, out, "k = ?")
 	assert.NotContains(t, out, "secret-value")
+	assert.Contains(t, out, "sqlite error")
+	assert.Contains(t, out, "gorm_logger_test.go")
 
 	common.DebugEnabled = true
-	buf.Reset()
-	newGormLoggerWithWriter(&buf).Trace(context.Background(), time.Now(), fc, driverErr)
-	assert.Contains(t, buf.String(), "secret-value")
+	debugOut := execQuery()
+	assert.Contains(t, debugOut, "secret-value")
+	assert.Contains(t, debugOut, "no such table")
 }

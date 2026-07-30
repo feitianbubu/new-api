@@ -68,8 +68,12 @@ function OAuthCallback() {
     flow_token?: string
     error_code?: string
   }
+  // Firefox sets opener to the window itself after window.open(url, '_self')
+  // and it survives the IdP roundtrip, so exclude it from bind detection.
   const mode: 'login' | 'bind' =
-    typeof window !== 'undefined' && window.opener ? 'bind' : 'login'
+    typeof window !== 'undefined' && window.opener && window.opener !== window
+      ? 'bind'
+      : 'login'
 
   useEffect(() => {
     if (typeof window === 'undefined') return

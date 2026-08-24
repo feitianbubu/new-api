@@ -334,10 +334,7 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-	})
+	common.ApiSuccess(c, buildMaskedTokenResponse(&cleanToken))
 }
 
 func DeleteToken(c *gin.Context) {

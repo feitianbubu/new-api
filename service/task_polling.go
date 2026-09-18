@@ -678,6 +678,14 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 		}
 		bc.TieredSnapshot.UsageFacts = usageFacts
 		bc.TieredSnapshot.EstimatedTier = result.MatchedTier
+		// 与 token 重算路径同形,把上游实际 tokens 带进结算日志(仅展示,不参与表达式计费)
+		if bc.CompletionTokens == 0 {
+			tokens := taskResult.TotalTokens
+			if tokens == 0 {
+				tokens = taskResult.CompletionTokens
+			}
+			bc.CompletionTokens = tokens
+		}
 		RecalculateTaskQuota(ctx, task, result.ActualQuotaAfterGroup, "任务用量表达式结算", result.Clamp)
 		return true
 	}

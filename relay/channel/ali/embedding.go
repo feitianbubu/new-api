@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -14,13 +15,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// DashScope 多模态向量不支持 OpenAI 兼容接口,必须走原生 multimodal 端点,故需单独识别。
-var MultimodalEmbeddingModels = map[string]bool{
-	"qwen3-vl-embedding": true,
-}
-
-func IsMultimodalEmbeddingModel(model string) bool {
-	return MultimodalEmbeddingModels[model]
+// Bailian multimodal embedding models (qwen3-vl-embedding, qwen2.5-vl-embedding,
+// tongyi-embedding-vision-*, multimodal-embedding-v1) are not served in
+// compatible mode; they only work on the native multimodal-embedding endpoint.
+// Matching the name families also covers dated snapshots.
+func isMultimodalEmbeddingModel(model string) bool {
+	return strings.Contains(model, "vl-embedding") ||
+		strings.Contains(model, "embedding-vision") ||
+		strings.HasPrefix(model, "multimodal-embedding")
 }
 
 type AliMultimodalContent struct {
@@ -56,78 +58,60 @@ type AliMultimodalEmbeddingResponse struct {
 }
 
 func convertToMultimodalEmbeddingRequest(request dto.EmbeddingRequest) (*AliMultimodalEmbeddingRequest, error) {
-	contents, err := convertInputToAliContents(request.Input)
-	if err != nil {
-		return nil, err
+	var items []any
+	switch input := request.Input.(type) {
+	case nil:
+		return nil, fmt.Errorf("embedding input is empty")
+	case string:
+		items = []any{input}
+	case []any:
+		items = input
+	default:
+		return nil, fmt.Errorf("unsupported embedding input type: %T", request.Input)
 	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("embedding input is empty")
+	}
+
 	aliReq := &AliMultimodalEmbeddingRequest{Model: request.Model}
-	aliReq.Input.Contents = contents
+	aliReq.Input.Contents = make([]AliMultimodalContent, 0, len(items))
+	for _, item := range items {
+		if text, ok := item.(string); ok {
+			aliReq.Input.Contents = append(aliReq.Input.Contents, AliMultimodalContent{Text: text})
+			continue
+		}
+		part, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("unsupported embedding input item type: %T", item)
+		}
+		partType, _ := part["type"].(string)
+		var content AliMultimodalContent
+		switch partType {
+		case "":
+			return nil, fmt.Errorf("multimodal input item missing required 'type' field")
+		case dto.ContentTypeText:
+			content.Text, _ = part[dto.ContentTypeText].(string)
+		case dto.ContentTypeImageURL:
+			url, err := parseURLField(part, dto.ContentTypeImageURL)
+			if err != nil {
+				return nil, err
+			}
+			content.Image = url
+		case dto.ContentTypeVideoUrl:
+			url, err := parseURLField(part, dto.ContentTypeVideoUrl)
+			if err != nil {
+				return nil, err
+			}
+			content.Video = url
+		default:
+			return nil, fmt.Errorf("unsupported multimodal input type: %s", partType)
+		}
+		aliReq.Input.Contents = append(aliReq.Input.Contents, content)
+	}
 	if request.Dimensions != nil {
 		aliReq.Parameters = &AliMultimodalEmbeddingParameters{Dimension: request.Dimensions}
 	}
 	return aliReq, nil
-}
-
-func convertInputToAliContents(input any) ([]AliMultimodalContent, error) {
-	if input == nil {
-		return nil, fmt.Errorf("embedding input is empty")
-	}
-	switch v := input.(type) {
-	case string:
-		return []AliMultimodalContent{{Text: v}}, nil
-	case []any:
-		return convertSliceToAliContents(v)
-	default:
-		return nil, fmt.Errorf("unsupported embedding input type: %T", input)
-	}
-}
-
-func convertSliceToAliContents(items []any) ([]AliMultimodalContent, error) {
-	if len(items) == 0 {
-		return nil, fmt.Errorf("embedding input is empty")
-	}
-	result := make([]AliMultimodalContent, 0, len(items))
-	for _, item := range items {
-		switch v := item.(type) {
-		case string:
-			result = append(result, AliMultimodalContent{Text: v})
-		case map[string]any:
-			content, err := parseAliContentItem(v)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, content)
-		default:
-			return nil, fmt.Errorf("unsupported embedding input item type: %T", item)
-		}
-	}
-	return result, nil
-}
-
-func parseAliContentItem(m map[string]any) (AliMultimodalContent, error) {
-	typeStr, ok := m["type"].(string)
-	if !ok || typeStr == "" {
-		return AliMultimodalContent{}, fmt.Errorf("multimodal input item missing required 'type' field")
-	}
-	switch typeStr {
-	case dto.ContentTypeText:
-		text, _ := m[dto.ContentTypeText].(string)
-		return AliMultimodalContent{Text: text}, nil
-	case dto.ContentTypeImageURL:
-		url, err := parseURLField(m, dto.ContentTypeImageURL)
-		if err != nil {
-			return AliMultimodalContent{}, err
-		}
-		return AliMultimodalContent{Image: url}, nil
-	case dto.ContentTypeVideoUrl:
-		url, err := parseURLField(m, dto.ContentTypeVideoUrl)
-		if err != nil {
-			return AliMultimodalContent{}, err
-		}
-		return AliMultimodalContent{Video: url}, nil
-	default:
-		return AliMultimodalContent{}, fmt.Errorf("unsupported multimodal input type: %s", typeStr)
-	}
 }
 
 func parseURLField(m map[string]any, key string) (string, error) {
@@ -144,23 +128,24 @@ func parseURLField(m map[string]any, key string) (string, error) {
 
 func MultimodalEmbeddingHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*types.NewAPIError, *dto.Usage) {
 	responseBody, err := io.ReadAll(resp.Body)
+	service.CloseResponseBodyGracefully(resp)
 	if err != nil {
 		return types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError), nil
 	}
-	service.CloseResponseBodyGracefully(resp)
 
 	var aliResponse AliMultimodalEmbeddingResponse
 	if err = common.Unmarshal(responseBody, &aliResponse); err != nil {
 		return types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError), nil
 	}
-	// 原生端点可能返回 200 但 body 带错误码
+	// The native endpoint can answer 200 with an error code in the body; the
+	// client must not receive that failure as a 200.
 	if aliResponse.Code != "" {
 		return types.WithOpenAIError(types.OpenAIError{
 			Message: aliResponse.Message,
 			Type:    aliResponse.Code,
 			Param:   aliResponse.RequestId,
 			Code:    aliResponse.Code,
-		}, resp.StatusCode), nil
+		}, http.StatusInternalServerError), nil
 	}
 
 	data := make([]dto.EmbeddingResponseItem, 0, len(aliResponse.Output.Embeddings))
@@ -172,16 +157,27 @@ func MultimodalEmbeddingHandler(c *gin.Context, resp *http.Response, info *relay
 		})
 	}
 
+	// The vl-embedding models and multimodal-embedding-v1 put text in
+	// input_tokens and image and video tokens in image_tokens;
+	// tongyi-embedding-vision counts all input in input_tokens and splits it in
+	// input_tokens_details. Only input is priced, so output_tokens (also part of
+	// total_tokens) is never billed. A response without usage falls back to the
+	// request estimate, as in compatible mode.
 	u := aliResponse.Usage
-	usage := dto.Usage{
-		PromptTokens: u.InputTokens + u.ImageTokens,
-		TotalTokens:  u.TotalTokens,
+	var usage dto.Usage
+	if details := u.InputTokensDetails; details != nil {
+		usage.PromptTokens = u.InputTokens
+		usage.PromptTokensDetails.TextTokens = details.TextTokens
+		usage.PromptTokensDetails.ImageTokens = details.ImageTokens
+	} else {
+		usage.PromptTokens = u.InputTokens + u.ImageTokens
+		usage.PromptTokensDetails.TextTokens = u.InputTokens
+		usage.PromptTokensDetails.ImageTokens = u.ImageTokens
 	}
-	usage.PromptTokensDetails.TextTokens = u.InputTokens
-	usage.PromptTokensDetails.ImageTokens = u.ImageTokens
-	if usage.TotalTokens == 0 {
-		usage.TotalTokens = usage.PromptTokens
+	if usage.PromptTokens == 0 {
+		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
+	usage.TotalTokens = usage.PromptTokens
 
 	embeddingResponse := dto.EmbeddingResponse{
 		Object: "list",
